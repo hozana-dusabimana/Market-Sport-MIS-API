@@ -1,0 +1,56 @@
+{
+  "app": {
+    "name": "Market SpotOn System",
+    "version": "1.0.0",
+    "description": "Digital Market Management Platform"
+  },
+  "server": {
+    "port": 3000,
+    "host": "localhost",
+    "env": "development",
+    "apiVersion": "v1",
+    "baseUrl": "http://localhost:3000",
+    "cors": {
+      "origin": ["http://localhost:5173", "http://localhost:3000"],
+      "credentials": true
+    }
+  },
+  "client": {
+    "port": 5173,
+    "host": "localhost",
+    "apiUrl": "http://localhost:3000/api/v1"
+  },
+  "database": {
+    "host": "localhost",
+    "port": 3306,
+    "user": "root",
+    "password": "YOUR_DATABASE_PASSWORD",
+    "name": "market_spoton_db",
+    "charset": "utf8mb4",
+    "timezone": "+00:00"
+  },
+  "jwt": {
+    "secret": "CHANGE_THIS_TO_A_RANDOM_SECRET_KEY_IN_PRODUCTION",
+    "expiresIn": "7d",
+    "algorithm": "HS256"
+  },
+  "bcrypt": {
+    "rounds": 10
+  },
+  "features": {
+    "enableNotifications": true,
+    "enableReports": true,
+    "enablePayments": true,
+    "enableRealTime": false
+  },
+  "payment": {
+    "methods": ["mobile_money", "bank_transfer", "cash", "card"],
+    "defaultCurrency": "USD",
+    "mobileMoneyProviders": ["mtn", "airtel", "vodafone"]
+  },
+  "logging": {
+    "level": "info",
+    "format": "combined"
+  }
+}
+

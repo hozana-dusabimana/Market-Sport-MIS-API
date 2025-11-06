@@ -1,0 +1,33 @@
+{
+    "name": "market-spoton-system",
+    "version": "1.0.0",
+    "description": "Market SpotOn System - Complete Full Stack Application",
+    "private": true,
+    "scripts": {
+        "install:all": "npm install && cd server && npm install && cd ../client && npm install",
+        "config:sync": "node scripts/sync-config.js",
+        "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+        "dev:server": "cd server && npm run dev",
+        "dev:client": "cd client && npm run dev",
+        "start": "concurrently \"npm run start:server\" \"npm run start:client\"",
+        "start:server": "cd server && npm start",
+        "start:client": "cd client && npm run preview",
+        "build": "cd client && npm run build",
+        "migrate": "cd server && npm run migrate",
+        "migrate:down": "cd server && npm run migrate:down",
+        "migrate:fresh": "cd server && npm run migrate:fresh",
+        "seed": "cd server && npm run seed",
+        "setup": "npm run install:all && npm run config:sync && npm run migrate && npm run seed"
+    },
+    "devDependencies": {
+        "concurrently": "^8.2.2"
+    },
+    "keywords": [
+        "market-management",
+        "digital-market",
+        "space-allocation",
+        "payment-system"
+    ],
+    "author": "",
+    "license": "ISC"
+}
