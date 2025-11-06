@@ -2,7 +2,6 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 
-// Try to read global config.json
 let globalConfig = null;
 const configPath = path.join(__dirname, '../../../config.json');
 if (fs.existsSync(configPath)) {
@@ -13,17 +12,12 @@ if (fs.existsSync(configPath)) {
   }
 }
 
-// Helper function to get config value (prefer env, then global config, then default)
-function getConfig(path, defaultValue) {
-  // First try environment variable
-  const envKey = path.toUpperCase().replace(/\./g, '_');
-  if (process.env[envKey] !== undefined) {
-    return process.env[envKey];
-  }
+function getConfig(keyPath, defaultValue) {
+  const envKey = keyPath.toUpperCase().replace(/\./g, '_');
+  if (process.env[envKey] !== undefined) return process.env[envKey];
   
-  // Then try global config
   if (globalConfig) {
-    const keys = path.split('.');
+    const keys = keyPath.split('.');
     let value = globalConfig;
     for (const key of keys) {
       value = value?.[key];
@@ -32,7 +26,6 @@ function getConfig(path, defaultValue) {
     if (value !== undefined) return value;
   }
   
-  // Finally use default
   return defaultValue;
 }
 
@@ -52,13 +45,13 @@ module.exports = {
   },
   
   jwt: {
-    secret: getConfig('jwt.secret', process.env.JWT_SECRET || 'your-secret-key'),
-    expire: getConfig('jwt.expiresIn', '7d'),
+    secret: getConfig('jwt.secret', 'your-super-secret-key-change-this-in-prod!'), // Stronger default
+    expire: getConfig('jwt.expire', '7d'),
     algorithm: getConfig('jwt.algorithm', 'HS256')
   },
   
   bcrypt: {
-    rounds: parseInt(getConfig('bcrypt.rounds', 10))
+    rounds: parseInt(getConfig('bcrypt.rounds', 12)) // Increased for security
   },
   
   cors: globalConfig?.server?.cors || {
