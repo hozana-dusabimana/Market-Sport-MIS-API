@@ -4,6 +4,7 @@ import { notificationService, Notification } from '../../services/notificationSe
 import toast from 'react-hot-toast'
 import { Plus, Bell, Check } from 'lucide-react'
 import { format } from 'date-fns'
+import { demoNotifications, useDemoData } from '../../utils/demoData'
 
 const Notifications = () => {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -15,7 +16,11 @@ const Notifications = () => {
   })
 
   const queryClient = useQueryClient()
-  const { data: notifications, isLoading } = useQuery('notifications', () => notificationService.getAll())
+  const { data: notificationsData, isLoading } = useQuery('notifications', () => notificationService.getAll(), {
+    retry: false,
+    onError: () => {},
+  })
+  const notifications = useDemoData(notificationsData, demoNotifications)
 
   const createMutation = useMutation(
     (notification: Notification) => notificationService.create(notification),

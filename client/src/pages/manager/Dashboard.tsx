@@ -3,11 +3,25 @@ import { zoneService } from '../../services/zoneService'
 import { spaceService } from '../../services/spaceService'
 import { allocationService } from '../../services/allocationService'
 import { MapPin, Square, Users, TrendingUp } from 'lucide-react'
+import { demoZones, demoSpaces, demoAllocations, useDemoData } from '../../utils/demoData'
 
 const ManagerDashboard = () => {
-  const { data: zones } = useQuery('zones', () => zoneService.getAll())
-  const { data: spaces } = useQuery('spaces', () => spaceService.getAll())
-  const { data: allocations } = useQuery('allocations', () => allocationService.getAll())
+  const { data: zonesData } = useQuery('zones', () => zoneService.getAll(), {
+    retry: false,
+    onError: () => {},
+  })
+  const { data: spacesData } = useQuery('spaces', () => spaceService.getAll(), {
+    retry: false,
+    onError: () => {},
+  })
+  const { data: allocationsData } = useQuery('allocations', () => allocationService.getAll(), {
+    retry: false,
+    onError: () => {},
+  })
+
+  const zones = useDemoData(zonesData, demoZones)
+  const spaces = useDemoData(spacesData, demoSpaces)
+  const allocations = useDemoData(allocationsData, demoAllocations)
 
   const stats = [
     {

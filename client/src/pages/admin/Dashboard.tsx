@@ -5,17 +5,38 @@ import { paymentService } from '../../services/paymentService'
 import { allocationService } from '../../services/allocationService'
 import { MapPin, Square, CreditCard, Users, TrendingUp, DollarSign } from 'lucide-react'
 import { format } from 'date-fns'
+import { demoZones, demoSpaces, demoPayments, demoAllocations, useDemoData } from '../../utils/demoData'
 
 const AdminDashboard = () => {
-  const { data: zones } = useQuery('zones', () => zoneService.getAll())
-  const { data: spaces } = useQuery('spaces', () => spaceService.getAll())
-  const { data: payments } = useQuery('payments', () =>
-    paymentService.getAll({
-      start_date: format(new Date(new Date().setMonth(new Date().getMonth() - 1)), 'yyyy-MM-dd'),
-      end_date: format(new Date(), 'yyyy-MM-dd'),
-    })
+  const { data: zonesData } = useQuery('zones', () => zoneService.getAll(), {
+    retry: false,
+    onError: () => {},
+  })
+  const { data: spacesData } = useQuery('spaces', () => spaceService.getAll(), {
+    retry: false,
+    onError: () => {},
+  })
+  const { data: paymentsData } = useQuery(
+    'payments',
+    () =>
+      paymentService.getAll({
+        start_date: format(new Date(new Date().setMonth(new Date().getMonth() - 1)), 'yyyy-MM-dd'),
+        end_date: format(new Date(), 'yyyy-MM-dd'),
+      }),
+    {
+      retry: false,
+      onError: () => {},
+    }
   )
-  const { data: allocations } = useQuery('allocations', () => allocationService.getAll())
+  const { data: allocationsData } = useQuery('allocations', () => allocationService.getAll(), {
+    retry: false,
+    onError: () => {},
+  })
+
+  const zones = useDemoData(zonesData, demoZones)
+  const spaces = useDemoData(spacesData, demoSpaces)
+  const payments = useDemoData(paymentsData, demoPayments)
+  const allocations = useDemoData(allocationsData, demoAllocations)
 
   const stats = [
     {

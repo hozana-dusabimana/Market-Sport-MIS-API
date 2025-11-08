@@ -5,6 +5,7 @@ import { spaceService } from '../../services/spaceService'
 import toast from 'react-hot-toast'
 import { Plus, Calendar, X } from 'lucide-react'
 import { format } from 'date-fns'
+import { demoAllocations, demoSpaces, useDemoData } from '../../utils/demoData'
 
 const Allocations = () => {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -17,8 +18,16 @@ const Allocations = () => {
   })
 
   const queryClient = useQueryClient()
-  const { data: allocations, isLoading } = useQuery('allocations', () => allocationService.getAll())
-  const { data: spaces } = useQuery('available-spaces', () => spaceService.getAvailable())
+  const { data: allocationsData, isLoading } = useQuery('allocations', () => allocationService.getAll(), {
+    retry: false,
+    onError: () => {},
+  })
+  const { data: spacesData } = useQuery('available-spaces', () => spaceService.getAvailable(), {
+    retry: false,
+    onError: () => {},
+  })
+  const allocations = useDemoData(allocationsData, demoAllocations)
+  const spaces = useDemoData(spacesData, demoSpaces.filter((s: any) => s.status === 'available'))
 
   const createMutation = useMutation((allocation: Allocation) => allocationService.create(allocation), {
     onSuccess: () => {

@@ -3,6 +3,7 @@ import { useQuery } from 'react-query'
 import { reportService } from '../../services/reportService'
 import { Calendar, Download, FileText } from 'lucide-react'
 import { format, subDays, subMonths, startOfWeek, startOfMonth } from 'date-fns'
+import { demoReports } from '../../utils/demoData'
 import {
   BarChart,
   Bar,
@@ -46,23 +47,34 @@ const Reports = () => {
     { enabled: reportType === 'monthly' }
   )
 
-  const { data: occupancyReport } = useQuery(
+  const { data: occupancyReportData } = useQuery(
     ['occupancy-report', reportType],
     () =>
       reportService.getOccupancyReport(
         format(subDays(new Date(), 30), 'yyyy-MM-dd'),
         format(new Date(), 'yyyy-MM-dd')
-      )
+      ),
+    {
+      retry: false,
+      onError: () => {},
+    }
   )
 
-  const { data: paymentReport } = useQuery(
+  const { data: paymentReportData } = useQuery(
     ['payment-report', reportType],
     () =>
       reportService.getPaymentReport(
         format(subDays(new Date(), 30), 'yyyy-MM-dd'),
         format(new Date(), 'yyyy-MM-dd')
-      )
+      ),
+    {
+      retry: false,
+      onError: () => {},
+    }
   )
+
+  const occupancyReport = occupancyReportData || { data: demoReports.occupancy }
+  const paymentReport = paymentReportData || { data: demoReports.payments, by_method: demoReports.by_method }
 
   const isLoading = dailyLoading || weeklyLoading || monthlyLoading
 

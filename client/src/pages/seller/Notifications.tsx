@@ -3,16 +3,18 @@ import { useAuthStore } from '../../store/authStore'
 import { notificationService } from '../../services/notificationService'
 import { Bell, Check } from 'lucide-react'
 import { format } from 'date-fns'
+import { demoNotifications, useDemoData } from '../../utils/demoData'
 
 const SellerNotifications = () => {
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
 
-  const { data: notifications, isLoading } = useQuery(
+  const { data: notificationsData, isLoading } = useQuery(
     'seller-notifications',
     () => notificationService.getAll({ user_id: user?.userId }),
-    { enabled: !!user?.userId }
+    { enabled: !!user?.userId, retry: false, onError: () => {} }
   )
+  const notifications = useDemoData(notificationsData, demoNotifications.filter((n: any) => n.user_type === 'seller' || n.user_type === 'all'))
 
   const markAsReadMutation = useMutation(
     (id: number) => notificationService.markAsRead(id),

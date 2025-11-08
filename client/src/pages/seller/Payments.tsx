@@ -3,15 +3,17 @@ import { useAuthStore } from '../../store/authStore'
 import { paymentService } from '../../services/paymentService'
 import { Download, CreditCard, Calendar } from 'lucide-react'
 import { format } from 'date-fns'
+import { demoPayments, useDemoData } from '../../utils/demoData'
 
 const SellerPayments = () => {
   const { user } = useAuthStore()
 
-  const { data: payments, isLoading } = useQuery(
+  const { data: paymentsData, isLoading } = useQuery(
     'seller-payments',
     () => paymentService.getSellerPayments(user?.userId || 0),
-    { enabled: !!user?.userId }
+    { enabled: !!user?.userId, retry: false, onError: () => {} }
   )
+  const payments = useDemoData(paymentsData, demoPayments.filter((p: any) => p.seller_id === 1))
 
   if (isLoading) {
     return <div className="text-center py-12">Loading payments...</div>

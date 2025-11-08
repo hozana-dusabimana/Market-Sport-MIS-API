@@ -3,15 +3,17 @@ import { useAuthStore } from '../../store/authStore'
 import { allocationService } from '../../services/allocationService'
 import { Square, Calendar, DollarSign } from 'lucide-react'
 import { format } from 'date-fns'
+import { demoAllocations, useDemoData } from '../../utils/demoData'
 
 const SellerSpaces = () => {
   const { user } = useAuthStore()
 
-  const { data: allocations, isLoading } = useQuery(
+  const { data: allocationsData, isLoading } = useQuery(
     'seller-allocations',
     () => allocationService.getAll({ seller_id: user?.userId }),
-    { enabled: !!user?.userId }
+    { enabled: !!user?.userId, retry: false, onError: () => {} }
   )
+  const allocations = useDemoData(allocationsData, demoAllocations.filter((a: any) => a.seller_id === 1))
 
   if (isLoading) {
     return <div className="text-center py-12">Loading your spaces...</div>

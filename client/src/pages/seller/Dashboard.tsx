@@ -5,27 +5,32 @@ import { paymentService } from '../../services/paymentService'
 import { notificationService } from '../../services/notificationService'
 import { Square, CreditCard, Bell, Calendar } from 'lucide-react'
 import { format } from 'date-fns'
+import { demoAllocations, demoPayments, demoNotifications, useDemoData } from '../../utils/demoData'
 
 const SellerDashboard = () => {
   const { user } = useAuthStore()
 
-  const { data: allocations } = useQuery(
+  const { data: allocationsData } = useQuery(
     'seller-allocations',
     () => allocationService.getAll({ seller_id: user?.userId }),
-    { enabled: !!user?.userId }
+    { enabled: !!user?.userId, retry: false, onError: () => {} }
   )
 
-  const { data: payments } = useQuery(
+  const { data: paymentsData } = useQuery(
     'seller-payments',
     () => paymentService.getSellerPayments(user?.userId || 0),
-    { enabled: !!user?.userId }
+    { enabled: !!user?.userId, retry: false, onError: () => {} }
   )
 
-  const { data: notifications } = useQuery(
+  const { data: notificationsData } = useQuery(
     'seller-notifications',
     () => notificationService.getAll({ user_id: user?.userId }),
-    { enabled: !!user?.userId }
+    { enabled: !!user?.userId, retry: false, onError: () => {} }
   )
+
+  const allocations = useDemoData(allocationsData, demoAllocations.filter((a: any) => a.seller_id === 1))
+  const payments = useDemoData(paymentsData, demoPayments.filter((p: any) => p.seller_id === 1))
+  const notifications = useDemoData(notificationsData, demoNotifications)
 
   const activeAllocations = allocations?.data?.filter((a: any) => a.status === 'active') || []
   const pendingPayments = payments?.data?.filter((p: any) => p.status === 'pending') || []

@@ -4,6 +4,7 @@ import { paymentService, Payment } from '../../services/paymentService'
 import toast from 'react-hot-toast'
 import { Plus, Download, CreditCard } from 'lucide-react'
 import { format } from 'date-fns'
+import { demoPayments, useDemoData } from '../../utils/demoData'
 
 const Payments = () => {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -17,7 +18,11 @@ const Payments = () => {
   })
 
   const queryClient = useQueryClient()
-  const { data: payments, isLoading } = useQuery('payments', () => paymentService.getAll())
+  const { data: paymentsData, isLoading } = useQuery('payments', () => paymentService.getAll(), {
+    retry: false,
+    onError: () => {},
+  })
+  const payments = useDemoData(paymentsData, demoPayments)
 
   const createMutation = useMutation((payment: Payment) => paymentService.create(payment), {
     onSuccess: () => {

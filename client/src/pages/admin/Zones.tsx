@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { zoneService, Zone } from '../../services/zoneService'
 import toast from 'react-hot-toast'
 import { Plus, Edit, Trash2, MapPin } from 'lucide-react'
+import { demoZones, useDemoData } from '../../utils/demoData'
 
 const Zones = () => {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -16,7 +17,11 @@ const Zones = () => {
   })
 
   const queryClient = useQueryClient()
-  const { data, isLoading } = useQuery('zones', () => zoneService.getAll())
+  const { data: zonesData, isLoading } = useQuery('zones', () => zoneService.getAll(), {
+    retry: false,
+    onError: () => {},
+  })
+  const data = useDemoData(zonesData, demoZones)
 
   const createMutation = useMutation((zone: Zone) => zoneService.create(zone), {
     onSuccess: () => {

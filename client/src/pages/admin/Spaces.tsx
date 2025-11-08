@@ -4,6 +4,7 @@ import { spaceService, Space } from '../../services/spaceService'
 import { zoneService } from '../../services/zoneService'
 import toast from 'react-hot-toast'
 import { Plus, Edit, Trash2, Square } from 'lucide-react'
+import { demoSpaces, demoZones, useDemoData } from '../../utils/demoData'
 
 const Spaces = () => {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -17,8 +18,16 @@ const Spaces = () => {
   })
 
   const queryClient = useQueryClient()
-  const { data: spaces, isLoading } = useQuery('spaces', () => spaceService.getAll())
-  const { data: zones } = useQuery('zones', () => zoneService.getAll())
+  const { data: spacesData, isLoading } = useQuery('spaces', () => spaceService.getAll(), {
+    retry: false,
+    onError: () => {},
+  })
+  const { data: zonesData } = useQuery('zones', () => zoneService.getAll(), {
+    retry: false,
+    onError: () => {},
+  })
+  const spaces = useDemoData(spacesData, demoSpaces)
+  const zones = useDemoData(zonesData, demoZones)
 
   const createMutation = useMutation((space: Space) => spaceService.create(space), {
     onSuccess: () => {
