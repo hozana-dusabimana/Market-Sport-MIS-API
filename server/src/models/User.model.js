@@ -1,39 +1,39 @@
 const db = require('../config/database');
 
 class User {
-  static async findByUsername(username) {
-    const [rows] = await db.query('SELECT * FROM users WHERE username = ? OR email = ?', [username, username]);
+  static async findByUsername(username, connection = db) {
+    const [rows] = await connection.query('SELECT * FROM users WHERE username = ? OR email = ?', [username, username]);
     return rows[0] || null;
   }
 
-  static async findById(userId) {
-    const [rows] = await db.query(
+  static async findById(userId, connection = db) {
+    const [rows] = await connection.query(
       'SELECT user_id, username, email, phone_number, user_type, status, profile_photo, created_at, last_login FROM users WHERE user_id = ?',
       [userId]
     );
     return rows[0] || null;
   }
 
-  static async findByEmail(email) {
-    const [rows] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+  static async findByEmail(email, connection = db) {
+    const [rows] = await connection.query('SELECT * FROM users WHERE email = ?', [email]);
     return rows[0] || null;
   }
 
-  static async exists(username, email) {
-    const [rows] = await db.query('SELECT user_id FROM users WHERE username = ? OR email = ?', [username, email]);
+  static async exists(username, email, connection = db) {
+    const [rows] = await connection.query('SELECT user_id FROM users WHERE username = ? OR email = ?', [username, email]);
     return rows.length > 0;
   }
 
-  static async create(userData) {
+  static async create(userData, connection = db) {
     const { username, email, password_hash, phone_number, user_type, status = 'active' } = userData;
-    const [result] = await db.query(
+    const [result] = await connection.query(
       `INSERT INTO users (username, email, password_hash, phone_number, user_type, status) VALUES (?, ?, ?, ?, ?, ?)`,
       [username, email, password_hash, phone_number, user_type, status]
     );
     return result.insertId || null;
   }
 
-  static async update(userId, updates) {
+  static async update(userId, updates, connection = db) {
     const fields = [];
     const values = [];
     Object.keys(updates).forEach(key => {
@@ -44,17 +44,17 @@ class User {
     });
     if (fields.length === 0) return false;
     values.push(userId);
-    const [result] = await db.query(`UPDATE users SET ${fields.join(', ')} WHERE user_id = ?`, values);
+    const [result] = await connection.query(`UPDATE users SET ${fields.join(', ')} WHERE user_id = ?`, values);
     return result.affectedRows > 0;
   }
 
-  static async updatePassword(userId, password_hash) {
-    const [result] = await db.query('UPDATE users SET password_hash = ? WHERE user_id = ?', [password_hash, userId]);
+  static async updatePassword(userId, password_hash, connection = db) {
+    const [result] = await connection.query('UPDATE users SET password_hash = ? WHERE user_id = ?', [password_hash, userId]);
     return result.affectedRows > 0;
   }
 
-  static async updateLastLogin(userId) {
-    const [result] = await db.query('UPDATE users SET last_login = NOW() WHERE user_id = ?', [userId]);
+  static async updateLastLogin(userId, connection = db) {
+    const [result] = await connection.query('UPDATE users SET last_login = NOW() WHERE user_id = ?', [userId]);
     return result.affectedRows > 0;
   }
 
@@ -74,8 +74,8 @@ class User {
     return { ...user, profile };
   }
 
-  static async updateStatus(userId, status) {
-    const [result] = await db.query('UPDATE users SET status = ? WHERE user_id = ?', [status, userId]);
+  static async updateStatus(userId, status, connection = db) {
+    const [result] = await connection.query('UPDATE users SET status = ? WHERE user_id = ?', [status, userId]);
     return result.affectedRows > 0;
   }
 
@@ -129,8 +129,8 @@ class User {
     return rows[0].count;
   }
 
-  static async delete(userId) {
-    const [result] = await db.query('DELETE FROM users WHERE user_id = ?', [userId]);
+  static async delete(userId, connection = db) {
+    const [result] = await connection.query('DELETE FROM users WHERE user_id = ?', [userId]);
     return result.affectedRows > 0;
   }
 
@@ -154,37 +154,37 @@ class User {
   }
 
   // Password Reset Methods
-  static async savePasswordResetToken(userId, resetToken, expiresAt) {
-    const [result] = await db.query(
+  static async savePasswordResetToken(userId, resetToken, expiresAt, connection = db) {
+    const [result] = await connection.query(
       'UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE user_id = ?',
       [resetToken, expiresAt, userId]
     );
     return result.affectedRows > 0;
   }
 
-  static async findByResetToken(resetToken) {
-    const [rows] = await db.query(
+  static async findByResetToken(resetToken, connection = db) {
+    const [rows] = await connection.query(
       'SELECT * FROM users WHERE reset_token = ? AND reset_token_expires > NOW()',
       [resetToken]
     );
     return rows[0] || null;
   }
 
-  static async clearPasswordResetToken(userId) {
-    const [result] = await db.query(
+  static async clearPasswordResetToken(userId, connection = db) {
+    const [result] = await connection.query(
       'UPDATE users SET reset_token = NULL, reset_token_expires = NULL WHERE user_id = ?',
       [userId]
     );
     return result.affectedRows > 0;
   }
 
-  static async updatePasswordWithToken(resetToken, password_hash) {
+  static async updatePasswordWithToken(resetToken, password_hash, connection = db) {
     // First verify the token is valid
-    const user = await this.findByResetToken(resetToken);
+    const user = await this.findByResetToken(resetToken, connection);
     if (!user) return false;
 
     // Update password and clear reset token
-    const [result] = await db.query(
+    const [result] = await connection.query(
       'UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE user_id = ?',
       [password_hash, user.user_id]
     );
