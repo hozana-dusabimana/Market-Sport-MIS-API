@@ -7,6 +7,7 @@ const errorMiddleware = require('./middleware/error.middleware');
 
 // Import routes
 const authRoutes = require('./routes/auth.routes');
+const userRoutes = require('./routes/user.routes');
 
 const app = express();
 
@@ -36,8 +37,9 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/v1/auth', authRoutes);
 
+
 // Uncomment these routes as you create them
-// app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/users', userRoutes);
 // app.use('/api/v1/zones', zoneRoutes);
 // app.use('/api/v1/spaces', spaceRoutes);
 // app.use('/api/v1/allocations', allocationRoutes);
