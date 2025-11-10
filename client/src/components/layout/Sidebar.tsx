@@ -11,6 +11,8 @@ import {
   Settings,
   ShoppingBag,
   Receipt,
+  Users,
+  UserCog,
 } from 'lucide-react'
 
 const Sidebar = () => {
@@ -23,6 +25,8 @@ const Sidebar = () => {
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/zones', label: 'Zones', icon: MapPin },
     { path: '/spaces', label: 'Spaces', icon: Square },
+    { path: '/sellers', label: 'Sellers', icon: Users },
+    { path: '/users', label: 'Users', icon: UserCog },
     { path: '/seller-registration', label: 'Seller Registration', icon: UserPlus },
     { path: '/allocations', label: 'Allocations', icon: ShoppingBag },
     { path: '/payments', label: 'Payments', icon: CreditCard },

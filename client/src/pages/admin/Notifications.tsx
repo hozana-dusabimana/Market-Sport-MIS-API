@@ -139,11 +139,12 @@ const Notifications = () => {
             <h2 className="text-2xl font-bold mb-4">Send Notification</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="label">Recipient Type</label>
+                <label className="label">Recipient Type *</label>
                 <select
                   value={formData.user_type}
                   onChange={(e) => setFormData({ ...formData, user_type: e.target.value as any })}
                   className="input"
+                  required
                 >
                   <option value="all">All Users</option>
                   <option value="admin">Admins</option>
@@ -152,7 +153,7 @@ const Notifications = () => {
                 </select>
               </div>
               <div>
-                <label className="label">Title</label>
+                <label className="label">Title *</label>
                 <input
                   type="text"
                   value={formData.title}
@@ -162,7 +163,7 @@ const Notifications = () => {
                 />
               </div>
               <div>
-                <label className="label">Message</label>
+                <label className="label">Message *</label>
                 <textarea
                   value={formData.message}
                   onChange={(e) => setFormData({ ...formData, message: e.target.value })}
@@ -172,11 +173,12 @@ const Notifications = () => {
                 />
               </div>
               <div>
-                <label className="label">Type</label>
+                <label className="label">Type *</label>
                 <select
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
                   className="input"
+                  required
                 >
                   <option value="info">Info</option>
                   <option value="success">Success</option>
