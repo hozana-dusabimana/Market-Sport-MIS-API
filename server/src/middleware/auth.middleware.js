@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config/config');
+const Blacklist = require('../models/Blacklist.model');
 
 const authenticate = (req, res, next) => {
   let token;
@@ -29,6 +30,39 @@ const authenticate = (req, res, next) => {
     }); // Detailed debug
     return res.status(403).json({ success: false, message: 'Invalid token' });
   }
+
+  const authMiddleware = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, message: 'No token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    // Verify JWT
+    const decoded = jwt.verify(token, config.jwt.secret);
+    req.user = decoded; // { userId, username, user_type }
+
+    // Check blacklist AFTER verification
+    const isBlacklisted = await Blacklist.isBlacklisted(token);
+    if (isBlacklisted) {
+      return res.status(401).json({ success: false, message: 'Token has been revoked' });
+    }
+  
+
+    next();
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ success: false, message: 'Token expired' });
+    }
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ success: false, message: 'Invalid token' });
+    }
+    console.error('Auth middleware error:', error);
+    res.status(500).json({ success: false, message: 'Authentication failed' });
+  }
+};
 };
 
 module.exports = { authenticate };

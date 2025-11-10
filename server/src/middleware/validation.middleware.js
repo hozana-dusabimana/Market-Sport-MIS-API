@@ -96,6 +96,41 @@ const validateChangePassword = [
   handleValidationErrors
 ];
 
+// Forgot password validation
+const validateForgotPassword = [
+  body('email')
+    .trim()
+    .isEmail()
+    .withMessage('Must be a valid email address')
+    .normalizeEmail(),
+  
+  handleValidationErrors
+];
+
+// Reset password validation
+const validateResetPassword = [
+  body('resetToken')
+    .trim()
+    .notEmpty()
+    .withMessage('Reset token is required'),
+  
+  body('new_password')
+    .isLength({ min: 6 })
+    .withMessage('New password must be at least 6 characters long'),
+  
+  body('confirm_password')
+    .isLength({ min: 6 })
+    .withMessage('Confirm password must be at least 6 characters long')
+    .custom((value, { req }) => {
+      if (value !== req.body.new_password) {
+        throw new Error('Passwords do not match');
+      }
+      return true;
+    }),
+  
+  handleValidationErrors
+];
+
 // Zone validation
 const validateZone = [
   body('zone_name')
@@ -295,6 +330,8 @@ module.exports = {
   validateRegistration,
   validateLogin,
   validateChangePassword,
+  validateForgotPassword,
+  validateResetPassword,
   validateZone,
   validateSpace,
   validateAllocation,

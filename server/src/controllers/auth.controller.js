@@ -2,6 +2,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../config/database');
 const config = require('../config/config');
+const User = require('../models/User.model');
+const Blacklist = require('../models/Blacklist.model');
 
 class AuthController {
   // Register new user
@@ -126,7 +128,7 @@ class AuthController {
     }
   }
 
-  // Login user
+  // Login user - User can only login if status is 'active'
   async login(req, res) {
     try {
       const { username, password } = req.body;
@@ -146,6 +148,7 @@ class AuthController {
 
       const user = users[0];
 
+      // User can login if and only if status is 'active'
       if (user.status !== 'active') {
         return res.status(403).json({ success: false, message: 'Account is suspended or inactive' });
       }
@@ -257,16 +260,46 @@ class AuthController {
         address
       } = req.body;
 
+      // Get current user data
+      const [users] = await connection.query(
+        'SELECT user_type, phone_number, profile_photo FROM users WHERE user_id = ?',
+        [userId]
+      );
+
+      if (users.length === 0) {
+        await connection.rollback();
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+
+      const currentUser = users[0];
+      const user_type = currentUser.user_type;
+
+      // Get current profile data
+      const profileTable = user_type === 'admin' ? 'admins' :
+                          user_type === 'manager' ? 'managers' : 'sellers';
+      
+      const [profiles] = await connection.query(`SELECT * FROM ${profileTable} WHERE user_id = ?`, [userId]);
+      const currentProfile = profiles[0] || {};
+
       const userUpdateFields = [];
       const userUpdateValues = [];
+      const sameUserFields = [];
 
       if (phone_number !== undefined) {
-        userUpdateFields.push('phone_number = ?');
-        userUpdateValues.push(phone_number);
+        if (phone_number === currentUser.phone_number) {
+          sameUserFields.push('phone_number');
+        } else {
+          userUpdateFields.push('phone_number = ?');
+          userUpdateValues.push(phone_number);
+        }
       }
       if (profile_photo !== undefined) {
-        userUpdateFields.push('profile_photo = ?');
-        userUpdateValues.push(profile_photo);
+        if (profile_photo === currentUser.profile_photo) {
+          sameUserFields.push('profile_photo');
+        } else {
+          userUpdateFields.push('profile_photo = ?');
+          userUpdateValues.push(profile_photo);
+        }
       }
 
       if (userUpdateFields.length > 0) {
@@ -274,70 +307,112 @@ class AuthController {
         await connection.query(`UPDATE users SET ${userUpdateFields.join(', ')} WHERE user_id = ?`, userUpdateValues);
       }
 
-      const [users] = await connection.query('SELECT user_type FROM users WHERE user_id = ?', [userId]);
-
-      if (users.length === 0) {
-        await connection.rollback();
-        return res.status(404).json({ success: false, message: 'User not found' });
-      }
-
-      const user_type = users[0].user_type;
-
       const profileUpdateFields = [];
       const profileUpdateValues = [];
+      const sameProfileFields = [];
 
       if (full_name !== undefined) {
-        profileUpdateFields.push('full_name = ?');
-        profileUpdateValues.push(full_name);
+        if (full_name === currentProfile.full_name) {
+          sameProfileFields.push('full_name');
+        } else {
+          profileUpdateFields.push('full_name = ?');
+          profileUpdateValues.push(full_name);
+        }
       }
 
       switch (user_type) {
         case 'admin':
           if (department !== undefined) {
-            profileUpdateFields.push('department = ?');
-            profileUpdateValues.push(department);
+            if (department === currentProfile.department) {
+              sameProfileFields.push('department');
+            } else {
+              profileUpdateFields.push('department = ?');
+              profileUpdateValues.push(department);
+            }
           }
           break;
         case 'manager':
           if (assigned_zones !== undefined) {
-            profileUpdateFields.push('assigned_zones = ?');
-            profileUpdateValues.push(assigned_zones ? JSON.stringify(assigned_zones) : null);
+            const newZones = assigned_zones ? JSON.stringify(assigned_zones) : null;
+            const currentZones = currentProfile.assigned_zones;
+            if (newZones === currentZones) {
+              sameProfileFields.push('assigned_zones');
+            } else {
+              profileUpdateFields.push('assigned_zones = ?');
+              profileUpdateValues.push(newZones);
+            }
           }
           break;
         case 'seller':
           if (business_name !== undefined) {
-            profileUpdateFields.push('business_name = ?');
-            profileUpdateValues.push(business_name);
+            if (business_name === currentProfile.business_name) {
+              sameProfileFields.push('business_name');
+            } else {
+              profileUpdateFields.push('business_name = ?');
+              profileUpdateValues.push(business_name);
+            }
           }
           if (business_type !== undefined) {
-            profileUpdateFields.push('business_type = ?');
-            profileUpdateValues.push(business_type);
+            if (business_type === currentProfile.business_type) {
+              sameProfileFields.push('business_type');
+            } else {
+              profileUpdateFields.push('business_type = ?');
+              profileUpdateValues.push(business_type);
+            }
           }
           if (tin_number !== undefined) {
-            profileUpdateFields.push('tin_number = ?');
-            profileUpdateValues.push(tin_number);
+            if (tin_number === currentProfile.tin_number) {
+              sameProfileFields.push('tin_number');
+            } else {
+              profileUpdateFields.push('tin_number = ?');
+              profileUpdateValues.push(tin_number);
+            }
           }
           if (emergency_contact !== undefined) {
-            profileUpdateFields.push('emergency_contact = ?');
-            profileUpdateValues.push(emergency_contact);
+            if (emergency_contact === currentProfile.emergency_contact) {
+              sameProfileFields.push('emergency_contact');
+            } else {
+              profileUpdateFields.push('emergency_contact = ?');
+              profileUpdateValues.push(emergency_contact);
+            }
           }
           if (address !== undefined) {
-            profileUpdateFields.push('address = ?');
-            profileUpdateValues.push(address);
+            if (address === currentProfile.address) {
+              sameProfileFields.push('address');
+            } else {
+              profileUpdateFields.push('address = ?');
+              profileUpdateValues.push(address);
+            }
           }
           break;
       }
 
       if (profileUpdateFields.length > 0) {
-        const profileTable = user_type === 'admin' ? 'admins' :
-                            user_type === 'manager' ? 'managers' : 'sellers';
         profileUpdateValues.push(userId);
         await connection.query(`UPDATE ${profileTable} SET ${profileUpdateFields.join(', ')} WHERE user_id = ?`, profileUpdateValues);
       }
 
       await connection.commit();
 
-      res.json({ success: true, message: 'Profile updated successfully' });
+      const allSameFields = [...sameUserFields, ...sameProfileFields];
+      
+      if (userUpdateFields.length === 0 && profileUpdateFields.length === 0) {
+        return res.json({ 
+          success: true, 
+          message: 'No changes made. All values are the same as existing values.',
+          sameFields: allSameFields
+        });
+      }
+
+      const responseMessage = allSameFields.length > 0
+        ? `Profile updated successfully. The following fields had the same value: ${allSameFields.join(', ')}`
+        : 'Profile updated successfully';
+
+      res.json({ 
+        success: true, 
+        message: responseMessage,
+        ...(allSameFields.length > 0 && { sameFields: allSameFields })
+      });
 
     } catch (error) {
       await connection.rollback();
@@ -387,6 +462,147 @@ class AuthController {
     } catch (error) {
       console.error('Change password error:', error);
       res.status(500).json({ success: false, message: 'Failed to change password', error: error.message });
+    }
+  }
+
+
+// Logout user
+async logout(req, res) {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(400).json({ success: false, message: 'No token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const userId = req.user.userId;
+
+    // Decode token to get expiry (without verifying, since middleware already did)
+    const decoded = jwt.decode(token);
+    if (!decoded || !decoded.exp) {
+      return res.status(400).json({ success: false, message: 'Invalid token' });
+    }
+
+    // Blacklist the token
+    const blacklisted = await Blacklist.add(token, userId, decoded.exp);
+    if (!blacklisted) {
+      console.warn('Failed to blacklist token for user:', userId);
+    }
+
+    console.log('User logged out and token blacklisted:', userId); // Debug log
+
+    // Client still discards token on their end
+    res.json({
+      success: true,
+      message: 'Logged out successfully'
+    });
+
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ success: false, message: 'Logout failed', error: error.message });
+  }
+}
+
+  // Forgot password - Generate reset token for email
+  async forgotPassword(req, res) {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ success: false, message: 'Email is required' });
+      }
+
+      const user = await User.findByEmail(email);
+
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'Email not found' });
+      }
+
+      // Optionally restrict to active users only; here we allow any status for recovery
+      if (user.status !== 'active') {
+        return res.status(403).json({ success: false, message: 'Account is inactive' });
+      }
+
+      // Generate short-lived JWT reset token (self-contained, no DB storage needed)
+      const resetToken = jwt.sign(
+        { userId: user.user_id, type: 'password_reset' },
+        config.jwt.secret,
+        { expiresIn: '15m' } // Short expiry for security
+      );
+
+      console.log('Reset token generated for user:', user.user_id); // Debug log
+
+      res.json({
+        success: true,
+        message: 'Reset token generated successfully. Use this to set a new password.',
+        data: { resetToken, email: user.email, user_type: user.user_type }
+      });
+
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      res.status(500).json({ success: false, message: 'Forgot password failed', error: error.message });
+    }
+  }
+
+  // Reset password using token
+  async resetPassword(req, res) {
+    try {
+      const { resetToken, new_password, confirm_password } = req.body;
+
+      if (!resetToken || !new_password || !confirm_password) {
+        return res.status(400).json({ success: false, message: 'Reset token, new password, and confirmation are required' });
+      }
+
+      if (new_password !== confirm_password) {
+        return res.status(400).json({ success: false, message: 'New password and confirmation do not match' });
+      }
+
+      if (new_password.length < 6) { // Basic validation; enhance as needed
+        return res.status(400).json({ success: false, message: 'New password must be at least 6 characters' });
+      }
+
+      // Verify the reset token
+      let decoded;
+      try {
+        decoded = jwt.verify(resetToken, config.jwt.secret);
+        if (decoded.type !== 'password_reset') {
+          return res.status(400).json({ success: false, message: 'Invalid reset token' });
+        }
+      } catch (error) {
+        console.error('Reset token verification error:', error);
+        return res.status(403).json({ success: false, message: 'Invalid or expired reset token' });
+      }
+
+      const userId = decoded.userId;
+      const user = await User.findById(userId);
+
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+
+      // Hash the new password
+      const new_password_hash = await bcrypt.hash(new_password, config.bcrypt.rounds);
+
+      // Update password
+      const updated = await User.updatePassword(userId, new_password_hash);
+
+      if (!updated) {
+        return res.status(500).json({ success: false, message: 'Failed to update password' });
+      }
+
+      // Optional: Update last_login or status here if needed
+      await User.updateLastLogin(userId);
+
+      console.log('Password reset successfully for user:', userId); // Debug log
+
+      res.json({
+        success: true,
+        message: 'Password reset successfully. You can now login with your new password.'
+      });
+
+    } catch (error) {
+      console.error('Reset password error:', error);
+      res.status(500).json({ success: false, message: 'Reset password failed', error: error.message });
     }
   }
 }

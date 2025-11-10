@@ -152,6 +152,44 @@ class User {
     `);
     return stats;
   }
+
+  // Password Reset Methods
+  static async savePasswordResetToken(userId, resetToken, expiresAt) {
+    const [result] = await db.query(
+      'UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE user_id = ?',
+      [resetToken, expiresAt, userId]
+    );
+    return result.affectedRows > 0;
+  }
+
+  static async findByResetToken(resetToken) {
+    const [rows] = await db.query(
+      'SELECT * FROM users WHERE reset_token = ? AND reset_token_expires > NOW()',
+      [resetToken]
+    );
+    return rows[0] || null;
+  }
+
+  static async clearPasswordResetToken(userId) {
+    const [result] = await db.query(
+      'UPDATE users SET reset_token = NULL, reset_token_expires = NULL WHERE user_id = ?',
+      [userId]
+    );
+    return result.affectedRows > 0;
+  }
+
+  static async updatePasswordWithToken(resetToken, password_hash) {
+    // First verify the token is valid
+    const user = await this.findByResetToken(resetToken);
+    if (!user) return false;
+
+    // Update password and clear reset token
+    const [result] = await db.query(
+      'UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE user_id = ?',
+      [password_hash, user.user_id]
+    );
+    return result.affectedRows > 0;
+  }
 }
 
 module.exports = User;
