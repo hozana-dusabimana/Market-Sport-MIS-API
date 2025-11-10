@@ -10,6 +10,8 @@ module.exports = {
         user_type ENUM('admin', 'manager', 'seller') NOT NULL,
         status ENUM('active', 'suspended', 'inactive') DEFAULT 'active',
         profile_photo VARCHAR(255),
+        reset_token VARCHAR(255) NULL,
+        reset_token_expires DATETIME NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         last_login TIMESTAMP NULL,
