@@ -8,6 +8,7 @@ const errorMiddleware = require('./middleware/error.middleware');
 // Import routes
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
+const sellerRoutes = require('./routes/seller.routes');
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use('/api/v1/auth', authRoutes);
 
 // Uncomment these routes as you create them
 app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/sellers', sellerRoutes);
 // app.use('/api/v1/zones', zoneRoutes);
 // app.use('/api/v1/spaces', spaceRoutes);
 // app.use('/api/v1/allocations', allocationRoutes);
