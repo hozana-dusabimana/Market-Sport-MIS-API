@@ -3,7 +3,8 @@ import { useAuthStore } from '../../store/authStore'
 import { allocationService } from '../../services/allocationService'
 import { paymentService } from '../../services/paymentService'
 import { notificationService } from '../../services/notificationService'
-import { Square, CreditCard, Bell, Calendar } from 'lucide-react'
+import { sellerService } from '../../services/sellerService'
+import { Square, CreditCard, Bell, Calendar, DollarSign, TrendingUp } from 'lucide-react'
 import { format } from 'date-fns'
 
 const SellerDashboard = () => {
@@ -27,9 +28,25 @@ const SellerDashboard = () => {
     { enabled: !!user?.userId }
   )
 
+  // Get seller profile first, then statistics
+  const { data: sellerProfile } = useQuery(
+    'seller-profile',
+    () => sellerService.getByUserId(user?.userId || 0),
+    { enabled: !!user?.userId && user?.user_type === 'seller' }
+  )
+
+  const { data: sellerStats } = useQuery(
+    'seller-statistics',
+    () => sellerService.getStatistics(sellerProfile?.data?.seller_id || 0),
+    { enabled: !!sellerProfile?.data?.seller_id }
+  )
+
   const activeAllocations = allocations?.data?.filter((a: any) => a.status === 'active') || []
   const pendingPayments = payments?.data?.filter((p: any) => p.status === 'pending') || []
   const unreadNotifications = notifications?.data?.filter((n: any) => !n.is_read) || []
+  const totalPaid = payments?.data?.reduce((sum: number, p: any) => {
+    return sum + (p.status === 'completed' ? p.amount : 0)
+  }, 0) || 0
 
   const stats = [
     {
@@ -37,6 +54,12 @@ const SellerDashboard = () => {
       value: activeAllocations.length,
       icon: Square,
       color: 'bg-blue-500',
+    },
+    {
+      name: 'Total Paid',
+      value: `$${totalPaid.toFixed(2)}`,
+      icon: DollarSign,
+      color: 'bg-green-500',
     },
     {
       name: 'Pending Payments',
@@ -74,6 +97,30 @@ const SellerDashboard = () => {
           )
         })}
       </div>
+
+      {sellerStats?.data && (
+        <div className="card mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">My Statistics</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-sm text-gray-600">Total Allocations</p>
+              <p className="text-2xl font-bold text-gray-900">{sellerStats.data.total_allocations || 0}</p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-sm text-gray-600">Active Allocations</p>
+              <p className="text-2xl font-bold text-green-600">{sellerStats.data.active_allocations || 0}</p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-sm text-gray-600">Total Payments</p>
+              <p className="text-2xl font-bold text-gray-900">{sellerStats.data.total_payments || 0}</p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-sm text-gray-600">Total Paid</p>
+              <p className="text-2xl font-bold text-green-600">${(sellerStats.data.total_paid || 0).toFixed(2)}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card">

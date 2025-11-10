@@ -78,6 +78,7 @@ const SellerRegistration = () => {
                 {...register('full_name')}
                 className="input"
                 placeholder="Enter full name"
+                required
               />
               {errors.full_name && (
                 <p className="mt-1 text-sm text-red-600">{errors.full_name.message}</p>
@@ -91,6 +92,7 @@ const SellerRegistration = () => {
                 {...register('id_number')}
                 className="input"
                 placeholder="Enter ID number"
+                required
               />
               {errors.id_number && (
                 <p className="mt-1 text-sm text-red-600">{errors.id_number.message}</p>
@@ -104,6 +106,7 @@ const SellerRegistration = () => {
                 {...register('username')}
                 className="input"
                 placeholder="Choose a username"
+                required
               />
               {errors.username && (
                 <p className="mt-1 text-sm text-red-600">{errors.username.message}</p>
@@ -117,6 +120,7 @@ const SellerRegistration = () => {
                 {...register('email')}
                 className="input"
                 placeholder="Enter email address"
+                required
               />
               {errors.email && (
                 <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
@@ -130,6 +134,7 @@ const SellerRegistration = () => {
                 {...register('phone_number')}
                 className="input"
                 placeholder="Enter phone number"
+                required
               />
               {errors.phone_number && (
                 <p className="mt-1 text-sm text-red-600">{errors.phone_number.message}</p>
@@ -143,6 +148,7 @@ const SellerRegistration = () => {
                 {...register('password')}
                 className="input"
                 placeholder="Create a password"
+                required
               />
               {errors.password && (
                 <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
