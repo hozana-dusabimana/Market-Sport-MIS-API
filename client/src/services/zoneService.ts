@@ -6,15 +6,16 @@ export interface Zone {
   zone_code: string
   description?: string
   location?: string
-  capacity?: number
+  manager_id?: number
+  total_spaces?: number
   status: 'active' | 'inactive'
   created_at?: string
   updated_at?: string
 }
 
 export const zoneService = {
-  getAll: async () => {
-    const response = await api.get('/zones')
+  getAll: async (params?: { status?: string; manager_id?: number; search?: string }) => {
+    const response = await api.get('/zones', { params })
     return response.data
   },
 
@@ -35,6 +36,16 @@ export const zoneService = {
 
   delete: async (id: number) => {
     const response = await api.delete(`/zones/${id}`)
+    return response.data
+  },
+
+  getSpaces: async (zoneId: number) => {
+    const response = await api.get(`/zones/${zoneId}/spaces`)
+    return response.data
+  },
+
+  getStatistics: async (zoneId: number) => {
+    const response = await api.get(`/zones/${zoneId}/statistics`)
     return response.data
   },
 }

@@ -3,35 +3,70 @@ import { zoneService } from '../../services/zoneService'
 import { spaceService } from '../../services/spaceService'
 import { allocationService } from '../../services/allocationService'
 import { MapPin, Square, Users, TrendingUp } from 'lucide-react'
+import { useAuthStore } from '../../store/authStore'
 
 const ManagerDashboard = () => {
-  const { data: zones } = useQuery('zones', () => zoneService.getAll())
-  const { data: spaces } = useQuery('spaces', () => spaceService.getAll())
-  const { data: allocations } = useQuery('allocations', () => allocationService.getAll())
+  const { user } = useAuthStore()
+  
+  const { data: zonesData } = useQuery('zones', () => zoneService.getAll(), {
+    retry: false,
+    onError: () => {},
+  })
+  const { data: spacesData } = useQuery('spaces', () => spaceService.getAll(), {
+    retry: false,
+    onError: () => {},
+  })
+  const { data: allocationsData } = useQuery('allocations', () => allocationService.getAll(), {
+    retry: false,
+    onError: () => {},
+  })
+
+  const zones = zonesData?.data || []
+  const spaces = spacesData?.data || []
+  const allocations = allocationsData?.data || []
+  
+  // Filter zones by manager if user is a manager
+  const managedZoneIds = user?.user_type === 'manager' && user?.profile?.assigned_zones
+    ? user.profile.assigned_zones
+    : []
+  const managedZones = managedZoneIds.length > 0
+    ? zones.filter((z: any) => managedZoneIds.includes(z.zone_id))
+    : zones
+
+  // Filter spaces by managed zones
+  const managedSpaces = managedZoneIds.length > 0
+    ? spaces.filter((s: any) => managedZoneIds.includes(s.zone_id))
+    : spaces
+
+  // Filter allocations by managed zones (through spaces)
+  const managedSpaceIds = managedSpaces.map((s: any) => s.space_id)
+  const managedAllocations = managedZoneIds.length > 0
+    ? allocations.filter((a: any) => managedSpaceIds.includes(a.space_id))
+    : allocations
 
   const stats = [
     {
       name: 'Managed Zones',
-      value: zones?.data?.length || 0,
+      value: managedZones.length || 0,
       icon: MapPin,
       color: 'bg-blue-500',
     },
     {
       name: 'Total Spaces',
-      value: spaces?.data?.length || 0,
+      value: managedSpaces.length || 0,
       icon: Square,
       color: 'bg-green-500',
     },
     {
       name: 'Active Allocations',
-      value: allocations?.data?.filter((a: any) => a.status === 'active')?.length || 0,
+      value: managedAllocations.filter((a: any) => a.status === 'active').length || 0,
       icon: Users,
       color: 'bg-purple-500',
     },
   ]
 
-  const availableSpaces = spaces?.data?.filter((s: any) => s.status === 'available')?.length || 0
-  const totalSpaces = spaces?.data?.length || 0
+  const availableSpaces = managedSpaces.filter((s: any) => s.status === 'available').length || 0
+  const totalSpaces = managedSpaces.length || 0
   const occupancyRate = totalSpaces > 0 ? ((totalSpaces - availableSpaces) / totalSpaces) * 100 : 0
 
   return (

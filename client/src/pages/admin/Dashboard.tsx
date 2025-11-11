@@ -5,51 +5,66 @@ import { paymentService } from '../../services/paymentService'
 import { allocationService } from '../../services/allocationService'
 import { userService } from '../../services/userService'
 import { sellerService } from '../../services/sellerService'
-import { MapPin, Square, CreditCard, Users, TrendingUp, DollarSign, UserCheck } from 'lucide-react'
-import { format } from 'date-fns'
+import { MapPin, Square, Users, TrendingUp, DollarSign, UserCheck } from 'lucide-react'
+import { format, subMonths } from 'date-fns'
 
 const AdminDashboard = () => {
-  const { data: zones } = useQuery('zones', () => zoneService.getAll())
-  const { data: spaces } = useQuery('spaces', () => spaceService.getAll())
-  const { data: payments } = useQuery('payments', () =>
-    paymentService.getAll({
-      start_date: format(new Date(new Date().setMonth(new Date().getMonth() - 1)), 'yyyy-MM-dd'),
-      end_date: format(new Date(), 'yyyy-MM-dd'),
-    })
-  )
+  const { data: zonesData } = useQuery('zones', () => zoneService.getAll(), {
+    retry: false,
+    onError: () => {},
+  })
+  const { data: spacesData } = useQuery('spaces', () => spaceService.getAll(), {
+    retry: false,
+    onError: () => {},
+  })
   const { data: allocations } = useQuery('allocations', () => allocationService.getAll())
   const { data: userStats } = useQuery('user-statistics', () => userService.getStatistics())
-  const { data: sellerStatusCount } = useQuery('seller-status-count', () => sellerService.countByStatus())
+  const { data: sellerStatusCount } = useQuery('seller-status-count', () => sellerService.getCountByStatus())
+
+  const zones = zonesData?.data || []
+  const spaces = spacesData?.data || []
+  const allocationsList = allocations?.data || []
+  
+  const { data: revenueData } = useQuery(
+    'revenue-total',
+    () => paymentService.getTotalRevenue({
+      date_from: format(subMonths(new Date(), 1), 'yyyy-MM-dd'),
+      date_to: format(new Date(), 'yyyy-MM-dd'),
+    }),
+    { retry: false, onError: () => {} }
+  )
+  
+  const totalRevenue = revenueData?.data?.total_revenue || 0
 
   const stats = [
     {
       name: 'Total Zones',
-      value: zones?.data?.length || 0,
+      value: zones.length || 0,
       icon: MapPin,
       color: 'bg-blue-500',
     },
     {
       name: 'Total Spaces',
-      value: spaces?.data?.length || 0,
+      value: spaces.length || 0,
       icon: Square,
       color: 'bg-green-500',
     },
     {
       name: 'Active Allocations',
-      value: allocations?.data?.filter((a: any) => a.status === 'active')?.length || 0,
+      value: allocationsList.filter((a: any) => a.status === 'active').length || 0,
       icon: Users,
       color: 'bg-purple-500',
     },
     {
       name: 'Monthly Revenue',
-      value: `$${payments?.data?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0}`,
+      value: `$${totalRevenue.toFixed(2)}`,
       icon: DollarSign,
       color: 'bg-yellow-500',
     },
   ]
 
-  const availableSpaces = spaces?.data?.filter((s: any) => s.status === 'available')?.length || 0
-  const totalSpaces = spaces?.data?.length || 0
+  const availableSpaces = spaces.filter((s: any) => s.status === 'available').length || 0
+  const totalSpaces = spaces.length || 0
   const occupancyRate = totalSpaces > 0 ? ((totalSpaces - availableSpaces) / totalSpaces) * 100 : 0
 
   return (
