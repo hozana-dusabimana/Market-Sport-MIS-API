@@ -1,0 +1,464 @@
+{
+  "info": {
+    "_postman_id": "lanari-payment-collection",
+    "name": "Market Spot - Lanari Payment Integration",
+    "description": "Complete API collection for Lanari payment integration in Market Spot",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0",
+    "created": "2025-01-15"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/v1/auth/login",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "v1", "auth", "login"]
+            },
+            "description": "Get JWT token for API requests. Copy token to {{authToken}} variable"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Allocations",
+      "item": [
+        {
+          "name": "Get All Allocations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/v1/allocations",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "v1", "allocations"]
+            },
+            "description": "Get list of all allocations"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Allocation by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/v1/allocations/1",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "v1", "allocations", "1"]
+            },
+            "description": "Get details of a specific allocation"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Payments - Traditional",
+      "item": [
+        {
+          "name": "Create Manual Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"allocation_id\": 1,\n  \"seller_id\": 5,\n  \"amount\": 5000,\n  \"payment_date\": \"2025-01-15\",\n  \"payment_method\": \"cash\",\n  \"payment_reference\": \"CASH-001\",\n  \"payment_period_start\": \"2025-01-01\",\n  \"payment_period_end\": \"2025-01-31\",\n  \"notes\": \"Cash payment for January rent\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/v1/payments",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "v1", "payments"]
+            },
+            "description": "Create a manual payment record (cash, check, etc.)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Payments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/v1/payments?limit=20&offset=0",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "v1", "payments"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Get all payments with pagination"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Payment by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/v1/payments/1",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "v1", "payments", "1"]
+            },
+            "description": "Get details of a specific payment"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Payments - Lanari",
+      "item": [
+        {
+          "name": "Process Lanari Payment (Manual Status)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Pre-request script to validate data",
+                  "console.log('Processing Lanari payment request...');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  var response = pm.response.json();",
+                  "  pm.environment.set('lastPaymentId', response.data.payment_id);",
+                  "  pm.environment.set('lastTransactionId', response.data.transaction_id);",
+                  "  console.log('Payment created with ID: ' + response.data.payment_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"allocation_id\": 1,\n  \"seller_id\": 5,\n  \"amount\": 1000,\n  \"customer_phone\": \"250788123456\",\n  \"payment_period_start\": \"2025-01-01\",\n  \"payment_period_end\": \"2025-01-31\",\n  \"notes\": \"Monthly space rent - Lanari Mobile Money\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/v1/payments/lanari/process",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "v1", "payments", "lanari", "process"]
+            },
+            "description": "Process payment via Lanari API with manual status tracking"
+          },
+          "response": []
+        },
+        {
+          "name": "Process Lanari Payment (Auto Confirmation)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  var response = pm.response.json();",
+                  "  pm.environment.set('lastPaymentId', response.data.payment_id);",
+                  "  console.log('Auto-confirmed payment with ID: ' + response.data.payment_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"allocation_id\": 1,\n  \"seller_id\": 5,\n  \"amount\": 2000,\n  \"customer_phone\": \"250788123456\",\n  \"payment_period_start\": \"2025-02-01\",\n  \"payment_period_end\": \"2025-02-28\",\n  \"notes\": \"Monthly space rent - Auto Confirmed\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/v1/payments/lanari/process-auto",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "v1", "payments", "lanari", "process-auto"]
+            },
+            "description": "Process payment via Lanari with automatic confirmation"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Lanari Payments Only",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/v1/payments?payment_method=lanari_mobile_money&limit=20",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "v1", "payments"],
+              "query": [
+                {
+                  "key": "payment_method",
+                  "value": "lanari_mobile_money"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Get all Lanari mobile money payments"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Payment Status Management",
+      "item": [
+        {
+          "name": "Update Payment Status to Completed",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"completed\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/v1/payments/{{lastPaymentId}}/status",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "v1", "payments", "{{lastPaymentId}}", "status"]
+            },
+            "description": "Update payment status (pending, completed, failed)"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Payment Status to Failed",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"failed\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/v1/payments/{{lastPaymentId}}/status",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "v1", "payments", "{{lastPaymentId}}", "status"]
+            },
+            "description": "Mark payment as failed"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Revenue Reports",
+      "item": [
+        {
+          "name": "Get Total Revenue",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/v1/payments/revenue/total",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "v1", "payments", "revenue", "total"]
+            },
+            "description": "Get total revenue from all completed payments"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Revenue by Zone",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/v1/payments/revenue/by-zone",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "v1", "payments", "revenue", "by-zone"]
+            },
+            "description": "Get revenue breakdown by zone"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Revenue by Payment Method",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:3000/api/v1/payments/revenue/by-method",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "v1", "payments", "revenue", "by-method"]
+            },
+            "description": "Get revenue breakdown by payment method"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "authToken",
+      "value": "your_jwt_token_here",
+      "type": "string",
+      "description": "JWT authentication token - get from Login endpoint"
+    },
+    {
+      "key": "lastPaymentId",
+      "value": "1",
+      "type": "string",
+      "description": "ID of last created payment"
+    },
+    {
+      "key": "lastTransactionId",
+      "value": "LANARI_TXN_000000",
+      "type": "string",
+      "description": "Transaction ID from last Lanari payment"
+    },
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string",
+      "description": "Base URL for API"
+    }
+  ]
+}
