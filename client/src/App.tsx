@@ -12,6 +12,12 @@ import Allocations from './pages/admin/Allocations'
 import Payments from './pages/admin/Payments'
 import Reports from './pages/admin/Reports'
 import Notifications from './pages/admin/Notifications'
+import ManagerZones from './pages/manager/Zones'
+import ManagerSpaces from './pages/manager/Spaces'
+import ManagerAllocations from './pages/manager/Allocations'
+import ManagerPayments from './pages/manager/Payments'
+import ManagerReports from './pages/manager/Reports'
+import ManagerNotifications from './pages/manager/Notifications'
 import SellerRegistration from './pages/admin/SellerRegistration'
 import Sellers from './pages/admin/Sellers'
 import Users from './pages/admin/Users'
@@ -79,12 +85,12 @@ function App() {
         {/* Manager routes */}
         {user?.user_type === 'manager' && (
           <>
-            <Route path="zones" element={<Zones />} />
-            <Route path="spaces" element={<Spaces />} />
-            <Route path="allocations" element={<Allocations />} />
-            <Route path="payments" element={<Payments />} />
-            <Route path="reports" element={<Reports />} />
-            <Route path="notifications" element={<Notifications />} />
+            <Route path="zones" element={<ManagerZones />} />
+            <Route path="spaces" element={<ManagerSpaces />} />
+            <Route path="allocations" element={<ManagerAllocations />} />
+            <Route path="payments" element={<ManagerPayments />} />
+            <Route path="reports" element={<ManagerReports />} />
+            <Route path="notifications" element={<ManagerNotifications />} />
           </>
         )}
       </Route>
