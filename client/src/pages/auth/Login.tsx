@@ -103,9 +103,8 @@ const Login = () => {
                 <div className="flex items-center justify-between mb-2">
                   <label className="block text-sm font-medium text-gray-700">Password *</label>
                   <Link
-                    to="/forgot-password"
+                    to="#"
                     className="text-sm text-teal-600 hover:text-teal-700 font-medium"
-                    aria-label="Forgot password"
                   >
                     Forgot Password?
                   </Link>

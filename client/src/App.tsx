@@ -3,8 +3,6 @@ import { useAuthStore } from './store/authStore'
 import Home from './pages/Home'
 import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
-import ForgotPassword from './pages/auth/ForgotPassword'
-import ResetPassword from './pages/auth/ResetPassword'
 import AdminDashboard from './pages/admin/Dashboard'
 import SellerDashboard from './pages/seller/Dashboard'
 import ManagerDashboard from './pages/manager/Dashboard'
@@ -34,10 +32,7 @@ function App() {
       <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" />} />
       <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to="/dashboard" />} />
       
-  <Route path="/forgot-password" element={!isAuthenticated ? <ForgotPassword /> : <Navigate to="/forgot-password" />} />
-  <Route path="/reset-password" element={!isAuthenticated ? <ResetPassword /> : <Navigate to="/dashboard" />} />
-
-  {/* Protected routes */}
+      {/* Protected routes */}
       <Route
         element={
           <ProtectedRoute>

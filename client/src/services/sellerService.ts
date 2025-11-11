@@ -37,24 +37,24 @@ export interface CreateSellerData {
 }
 
 export const sellerService = {
-  getAll: async () => {
-    const response = await api.get<{ success: boolean; data: Seller[] }>('/api/v1/sellers')
+  getAll: async (params?: Record<string, unknown>) => {
+    const response = await api.get<{ success: boolean; data: Seller[] }>('/sellers', { params })
     return response.data.data
   },
 
   getOne: async (id: number) => {
-    const response = await api.get<{ success: boolean; data: Seller }>(`/api/v1/sellers/${id}`)
+    const response = await api.get<{ success: boolean; data: Seller }>(`/sellers/${id}`)
     return response.data.data
   },
 
   create: async (data: CreateSellerData) => {
-    const response = await api.post<{ success: boolean; data: Seller }>('/api/v1/sellers', data)
+    const response = await api.post<{ success: boolean; data: Seller }>('/sellers', data)
     return response.data
   },
 
   updateStatus: async (id: number, status: Seller['status']) => {
     const response = await api.patch<{ success: boolean; data: Seller }>(
-      `/api/v1/sellers/${id}/status`,
+      `/sellers/${id}/status`,
       { status }
     )
     return response.data
@@ -62,21 +62,21 @@ export const sellerService = {
 
   updateProfile: async (id: number, data: Partial<Omit<Seller, 'id' | 'user_id' | 'user' | 'allocations'>>) => {
     const response = await api.put<{ success: boolean; data: Seller }>(
-      `/api/v1/sellers/${id}/profile`,
+      `/sellers/${id}/profile`,
       data
     )
     return response.data
   },
 
   delete: async (id: number) => {
-    const response = await api.delete<{ success: boolean }>(`/api/v1/sellers/${id}`)
+    const response = await api.delete<{ success: boolean }>(`/sellers/${id}`)
     return response.data
   },
 
   // Get seller's allocations history
   getAllocations: async (id: number) => {
     const response = await api.get<{ success: boolean; data: Seller['allocations'] }>(
-      `/api/v1/sellers/${id}/allocations`
+      `/sellers/${id}/allocations`
     )
     return response.data.data
   },
@@ -93,7 +93,21 @@ export const sellerService = {
         status: 'pending' | 'completed' | 'failed'
         description: string
       }[]
-    }>(`/api/v1/sellers/${id}/payments`, { params })
+    }>(`/sellers/${id}/payments`, { params })
+    return response.data.data
+  },
+
+  // Count sellers grouped by verification_status
+  countByStatus: async () => {
+    const response = await api.get<{ success: boolean; data: { verification_status: string; count: number }[] }>(
+      '/sellers/status-count'
+    )
+    return response.data
+  },
+
+  // Get aggregated statistics for a seller
+  getStatistics: async (id: number) => {
+    const response = await api.get<{ success: boolean; data: Record<string, unknown> }>(`/sellers/${id}/statistics`)
     return response.data.data
   }
 }
