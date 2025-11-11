@@ -1,5 +1,5 @@
-const db = require('../config/database');
-const Seller = require('../models/Seller.model'); // Adjust path as needed
+import db from '../config/database.js';
+import Seller from '../models/Seller.model.js'; // Adjust path as needed
 
 class SellerController {
   // Get all sellers with filters and pagination
@@ -386,4 +386,4 @@ class SellerController {
   }
 }
 
-module.exports = new SellerController();
+export default new SellerController();

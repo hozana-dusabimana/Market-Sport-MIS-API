@@ -1,7 +1,7 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const sellerController = require('../controllers/seller.controller'); // Adjust path as needed
-const { authenticate } = require('../middleware/auth.middleware');
+import sellerController from '../controllers/seller.controller.js'; // Adjust path as needed
+import { authenticate } from '../middleware/auth.middleware.js';
 // Optional: Add role-based middleware, e.g., requireRole(['admin', 'manager'])
 
 /**
@@ -310,4 +310,4 @@ router.delete('/:id', authenticate, sellerController.deleteSeller);
 // POST last
 router.post('/', authenticate, sellerController.createSeller);
 
-module.exports = router;
+export default router;

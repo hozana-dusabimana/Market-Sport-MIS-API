@@ -1,5 +1,5 @@
-const crypto = require('crypto');
-const db = require('../config/database');
+import crypto from 'crypto';
+import db from '../config/database.js';
 
 class Blacklist {
   // Add a token to blacklist (hash it for security)
@@ -39,4 +39,4 @@ class Blacklist {
   }
 }
 
-module.exports = Blacklist;
+export default Blacklist;

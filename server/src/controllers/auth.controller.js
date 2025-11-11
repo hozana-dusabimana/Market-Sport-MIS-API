@@ -1,9 +1,9 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const db = require('../config/database');
-const config = require('../config/config');
-const User = require('../models/User.model');
-const Blacklist = require('../models/Blacklist.model');
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import db from '../config/database.js';
+import config from '../config/config.js';
+import User from '../models/User.model.js';
+import Blacklist from '../models/Blacklist.model.js';
 
 class AuthController {
   // Register new user
@@ -607,4 +607,4 @@ async logout(req, res) {
   }
 }
 
-module.exports = new AuthController();
+export default new AuthController();
