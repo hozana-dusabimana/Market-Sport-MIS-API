@@ -21,6 +21,8 @@ import SellerNotifications from './pages/seller/Notifications'
 import Profile from './pages/shared/Profile'
 import Layout from './components/layout/Layout'
 import ProtectedRoute from './components/auth/ProtectedRoute'
+import ForgotPassword from './pages/auth/ForgotPassword'
+import ResetPassword from './pages/auth/ResetPassword'
 
 function App() {
   const { user, isAuthenticated } = useAuthStore()
@@ -31,6 +33,9 @@ function App() {
       <Route path="/" element={!isAuthenticated ? <Home /> : <Navigate to="/dashboard" />} />
       <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" />} />
       <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to="/dashboard" />} />
+
+      <Route path='/forgot-password' element={!isAuthenticated ? <ForgotPassword/> : <Navigate to="/dashboard"/>}/>
+      <Route path='/reset-password' element={!isAuthenticated ? <ResetPassword/> : <Navigate to="/dashboard"/>}/>
       
       {/* Protected routes */}
       <Route

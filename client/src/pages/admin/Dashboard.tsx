@@ -34,34 +34,35 @@ const AdminDashboard = () => {
     { retry: false, onError: () => {} }
   )
   
-  const totalRevenue = revenueData?.data?.total_revenue || 0
+ const totalRevenue = Number(revenueData?.data?.total_revenue) || 0;
 
-  const stats = [
-    {
-      name: 'Total Zones',
-      value: zones.length || 0,
-      icon: MapPin,
-      color: 'bg-blue-500',
-    },
-    {
-      name: 'Total Spaces',
-      value: spaces.length || 0,
-      icon: Square,
-      color: 'bg-green-500',
-    },
-    {
-      name: 'Active Allocations',
-      value: allocationsList.filter((a: any) => a.status === 'active').length || 0,
-      icon: Users,
-      color: 'bg-purple-500',
-    },
-    {
-      name: 'Monthly Revenue',
-      value: `$${totalRevenue.toFixed(2)}`,
-      icon: DollarSign,
-      color: 'bg-yellow-500',
-    },
-  ]
+const stats = [
+  {
+    name: 'Total Zones',
+    value: zones.length || 0,
+    icon: MapPin,
+    color: 'bg-blue-500',
+  },
+  {
+    name: 'Total Spaces',
+    value: spaces.length || 0,
+    icon: Square,
+    color: 'bg-green-500',
+  },
+  {
+    name: 'Active Allocations',
+    value: allocationsList.filter((a: any) => a.status === 'active').length || 0,
+    icon: Users,
+    color: 'bg-purple-500',
+  },
+  {
+    name: 'Monthly Revenue',
+    value: `$${totalRevenue.toFixed(2)}`, // now safe
+    icon: DollarSign,
+    color: 'bg-yellow-500',
+  },
+];
+
 
   const availableSpaces = spaces.filter((s: any) => s.status === 'available').length || 0
   const totalSpaces = spaces.length || 0
