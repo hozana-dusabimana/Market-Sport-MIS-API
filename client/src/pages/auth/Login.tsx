@@ -105,7 +105,6 @@ const Login = () => {
                   <Link
                     to="/forgot-password"
                     className="text-sm text-teal-600 hover:text-teal-700 font-medium"
-                    aria-label="Forgot password"
                   >
                     Forgot Password?
                   </Link>
