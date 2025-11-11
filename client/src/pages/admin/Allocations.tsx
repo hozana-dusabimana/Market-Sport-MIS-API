@@ -64,7 +64,17 @@ const Allocations = () => {
     : allAllocations
   const spaces = managedZoneIds.length > 0 ? managedSpaces : allSpaces
 
-  const createMutation = useMutation((allocation: Allocation) => allocationService.create(allocation), {
+  const createMutation = useMutation((allocation: Allocation) => {
+    // For managers, validate that the space belongs to their managed zones
+    if (user?.user_type === 'manager' && managedZoneIds.length > 0) {
+      const selectedSpace = spaces.find((s: any) => s.space_id === allocation.space_id)
+      if (selectedSpace && !managedZoneIds.includes(selectedSpace.zone_id)) {
+        toast.error('You can only create allocations for spaces in your managed zones')
+        throw new Error('Unauthorized allocation')
+      }
+    }
+    return allocationService.create(allocation)
+  }, {
     onSuccess: () => {
       queryClient.invalidateQueries('allocations')
       queryClient.invalidateQueries('spaces')
@@ -73,7 +83,9 @@ const Allocations = () => {
       resetForm()
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to create allocation')
+      if (error.message !== 'Unauthorized allocation') {
+        toast.error(error.response?.data?.message || 'Failed to create allocation')
+      }
     },
   })
 
@@ -203,6 +215,14 @@ const Allocations = () => {
                       {allocation.status === 'active' && (
                         <button
                           onClick={() => {
+                            // For managers, validate that the allocation is in their managed zones
+                            if (user?.user_type === 'manager' && managedZoneIds.length > 0) {
+                              const allocationSpace = spaces.find((s: any) => s.space_id === allocation.space_id)
+                              if (allocationSpace && !managedZoneIds.includes(allocationSpace.zone_id)) {
+                                toast.error('You can only terminate allocations in your managed zones')
+                                return
+                              }
+                            }
                             if (confirm('Are you sure you want to terminate this allocation?')) {
                               terminateMutation.mutate({ id: allocation.allocation_id! })
                             }

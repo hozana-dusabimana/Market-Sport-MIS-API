@@ -134,16 +134,22 @@ const SellerPayments = () => {
                     <td className="py-3 px-4">
                       {payment.status === 'completed' && (
                         <button
-                          onClick={() => {
-                            paymentService.generateReceipt(payment.payment_id).then((blob) => {
+                          onClick={async () => {
+                            try {
+                              const blob = await paymentService.generateReceipt(payment.payment_id)
                               const url = window.URL.createObjectURL(blob)
                               const a = document.createElement('a')
                               a.href = url
                               a.download = `receipt-${payment.payment_id}.pdf`
                               a.click()
-                            })
+                              window.URL.revokeObjectURL(url)
+                            } catch (error: any) {
+                              console.error('Receipt download failed:', error)
+                              // Receipt generation might not be available, silently fail
+                            }
                           }}
                           className="text-primary-600 hover:text-primary-700"
+                          title="Download Receipt"
                         >
                           <Download size={18} />
                         </button>

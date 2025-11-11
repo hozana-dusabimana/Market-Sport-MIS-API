@@ -6,19 +6,34 @@ import { z } from 'zod'
 import { zoneService } from '../../services/zoneService'
 import { spaceService } from '../../services/spaceService'
 import { allocationService } from '../../services/allocationService'
-import { sellerService } from '../../services/sellerService' // <-- Make sure this exists
-import { MapPin, Square, Users, TrendingUp, Plus, X, Eye } from 'lucide-react'
+import { sellerService } from '../../services/sellerService'
+import { authService, RegisterData } from '../../services/authService'
+import { MapPin, Square, Users, TrendingUp, Plus, X, UserPlus } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
-import { SellerDetailsModal } from '@/components/seller/SellerDetailsModal'
-import ManagerUsersPage from './Users'
+import toast from 'react-hot-toast'
+
+const sellerSchema = z.object({
+  username: z.string().min(3, 'Username must be at least 3 characters'),
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  phone_number: z.string().min(10, 'Invalid phone number'),
+  full_name: z.string().min(2, 'Full name is required'),
+  id_number: z.string().min(1, 'ID number is required'),
+  business_name: z.string().optional(),
+  business_type: z.string().optional(),
+  tin_number: z.string().optional(),
+  emergency_contact: z.string().optional(),
+  address: z.string().optional(),
+})
+
+type SellerFormData = z.infer<typeof sellerSchema>
 
 const ManagerDashboard = () => {
   const { user } = useAuthStore()
+  const queryClient = useQueryClient()
 
   // --- State ---
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [showSellerDetails, setShowSellerDetails] = useState(false)
-  const [selectedSeller, setSelectedSeller] = useState<any>(null)
 
   // --- Queries ---
   const { data: zonesData } = useQuery('zones', () => zoneService.getAll(), { retry: false, onError: () => {} })
@@ -29,7 +44,7 @@ const ManagerDashboard = () => {
   const zones = zonesData?.data || []
   const spaces = spacesData?.data || []
   const allocations = allocationsData?.data || []
-  const sellers = sellersData?.data || []
+  const sellers = sellersData?.data?.sellers || sellersData?.data || []
 
   // --- Filter by manager ---
   const managedZoneIds = user?.user_type === 'manager' && user?.profile?.assigned_zones
@@ -49,24 +64,61 @@ const ManagerDashboard = () => {
     ? allocations.filter((a: any) => managedSpaceIds.includes(a.space_id))
     : allocations
 
+  // Filter sellers by managed zones (sellers who have allocations in managed zones)
+  const managedSellerIds = new Set(
+    managedAllocations.map((a: any) => a.seller_id).filter(Boolean)
+  )
+  const managedSellers = managedZoneIds.length > 0
+    ? sellers.filter((s: any) => managedSellerIds.has(s.seller_id) || managedSellerIds.has(s.user_id))
+    : sellers
+
   // --- Stats ---
   const stats = [
     { name: 'Managed Zones', value: managedZones.length || 0, icon: MapPin, color: 'bg-blue-500' },
     { name: 'Total Spaces', value: managedSpaces.length || 0, icon: Square, color: 'bg-green-500' },
     { name: 'Active Allocations', value: managedAllocations.filter((a: any) => a.status === 'active').length || 0, icon: Users, color: 'bg-purple-500' },
-    { name: 'Total Sellers', value: sellers.length || 0, icon: Users, color: 'bg-indigo-500' },
+    { name: 'Total Sellers', value: managedSellers.length || 0, icon: Users, color: 'bg-indigo-500' },
   ]
 
   const availableSpaces = managedSpaces.filter((s: any) => s.status === 'available').length || 0
   const totalSpaces = managedSpaces.length || 0
   const occupancyRate = totalSpaces > 0 ? ((totalSpaces - availableSpaces) / totalSpaces) * 100 : 0
 
-  // --- Form setup (placeholder) ---
-  const { register, handleSubmit, reset: resetForm, formState: { errors } } = useForm({
-    resolver: zodResolver(z.object({})) // Adjust schema as needed
+  // --- Form setup ---
+  const {
+    register,
+    handleSubmit,
+    reset: resetForm,
+    formState: { errors },
+  } = useForm<SellerFormData>({
+    resolver: zodResolver(sellerSchema),
   })
-  const createSellerMutation = useMutation((data: any) => sellerService.create(data)) // Placeholder mutation
-  const onCreateSeller = (data: any) => createSellerMutation.mutate(data)
+
+  const createSellerMutation = useMutation(
+    async (data: SellerFormData) => {
+      const registerData: RegisterData = {
+        ...data,
+        user_type: 'seller',
+        registration_date: new Date().toISOString().split('T')[0],
+      }
+      return await authService.register(registerData)
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('sellers')
+        toast.success('Seller registered successfully!')
+        setShowCreateModal(false)
+        resetForm()
+      },
+      onError: (error: any) => {
+        toast.error(error.response?.data?.message || 'Registration failed')
+      },
+    }
+  )
+
+  const onSubmit = (data: SellerFormData) => {
+    createSellerMutation.mutate(data)
+  }
 
   return (
     <div>
@@ -88,6 +140,9 @@ const ManagerDashboard = () => {
           <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[95vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <div>
+                <div className="inline-flex items-center justify-center w-12 h-12 bg-primary-100 rounded-full mb-3">
+                  <UserPlus className="w-6 h-6 text-primary-600" />
+                </div>
                 <h2 className="text-2xl font-bold">Register New Seller</h2>
                 <p className="text-gray-600 mt-1 text-sm">Fill in the seller's information to create their account</p>
               </div>
@@ -98,14 +153,157 @@ const ManagerDashboard = () => {
                 <X size={24} />
               </button>
             </div>
-            <form onSubmit={handleSubmit(onCreateSeller)} className="space-y-6">
-              {/* Form fields here */}
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="label">Full Name *</label>
+                  <input
+                    type="text"
+                    {...register('full_name')}
+                    className="input"
+                    placeholder="Enter full name"
+                    required
+                  />
+                  {errors.full_name && (
+                    <p className="mt-1 text-sm text-red-600">{errors.full_name.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="label">ID Number *</label>
+                  <input
+                    type="text"
+                    {...register('id_number')}
+                    className="input"
+                    placeholder="Enter ID number"
+                    required
+                  />
+                  {errors.id_number && (
+                    <p className="mt-1 text-sm text-red-600">{errors.id_number.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="label">Username *</label>
+                  <input
+                    type="text"
+                    {...register('username')}
+                    className="input"
+                    placeholder="Choose a username"
+                    required
+                  />
+                  {errors.username && (
+                    <p className="mt-1 text-sm text-red-600">{errors.username.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="label">Email *</label>
+                  <input
+                    type="email"
+                    {...register('email')}
+                    className="input"
+                    placeholder="Enter email address"
+                    required
+                  />
+                  {errors.email && (
+                    <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="label">Phone Number *</label>
+                  <input
+                    type="tel"
+                    {...register('phone_number')}
+                    className="input"
+                    placeholder="Enter phone number"
+                    required
+                  />
+                  {errors.phone_number && (
+                    <p className="mt-1 text-sm text-red-600">{errors.phone_number.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="label">Password *</label>
+                  <input
+                    type="password"
+                    {...register('password')}
+                    className="input"
+                    placeholder="Create a password"
+                    required
+                  />
+                  {errors.password && (
+                    <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="label">Business Name</label>
+                  <input
+                    type="text"
+                    {...register('business_name')}
+                    className="input"
+                    placeholder="Enter business name"
+                  />
+                </div>
+
+                <div>
+                  <label className="label">Business Type</label>
+                  <input
+                    type="text"
+                    {...register('business_type')}
+                    className="input"
+                    placeholder="e.g., Retail, Food, etc."
+                  />
+                </div>
+
+                <div>
+                  <label className="label">TIN Number</label>
+                  <input
+                    type="text"
+                    {...register('tin_number')}
+                    className="input"
+                    placeholder="Enter TIN number"
+                  />
+                </div>
+
+                <div>
+                  <label className="label">Emergency Contact</label>
+                  <input
+                    type="tel"
+                    {...register('emergency_contact')}
+                    className="input"
+                    placeholder="Enter emergency contact"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="label">Address</label>
+                  <textarea
+                    {...register('address')}
+                    className="input"
+                    rows={3}
+                    placeholder="Enter address"
+                  />
+                </div>
+              </div>
+
               <div className="flex space-x-3 pt-4">
                 <button type="submit" disabled={createSellerMutation.isLoading} className="btn btn-primary">
                   {createSellerMutation.isLoading ? 'Registering...' : 'Register Seller'}
                 </button>
-                <button type="button" onClick={resetForm} className="btn btn-secondary">Clear Form</button>
-                <button type="button" onClick={() => { setShowCreateModal(false); resetForm() }} className="btn btn-secondary">Cancel</button>
+                <button type="button" onClick={() => resetForm()} className="btn btn-secondary">
+                  Clear Form
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowCreateModal(false); resetForm() }}
+                  className="btn btn-secondary"
+                >
+                  Cancel
+                </button>
               </div>
             </form>
           </div>
@@ -147,19 +345,25 @@ const ManagerDashboard = () => {
       </div>
 
       {/* Sellers Section */}
-      {sellers && sellers.length > 0 && (
+      {managedSellers && managedSellers.length > 0 && (
         <div className="card mb-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Managed Sellers</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sellers.map((seller: any) => (
-              <div key={seller.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+            {managedSellers.map((seller: any) => (
+              <div key={seller.seller_id || seller.user_id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900">{seller.business_name || seller.user?.username}</h3>
-                    <p className="text-xs text-gray-600">{seller.business_type}</p>
+                    <h3 className="font-semibold text-gray-900">{seller.business_name || seller.full_name || seller.user?.username || 'N/A'}</h3>
+                    <p className="text-xs text-gray-600">{seller.business_type || 'N/A'}</p>
                   </div>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${seller.status === 'active' ? 'bg-green-100 text-green-800' : seller.status === 'inactive' ? 'bg-gray-100 text-gray-800' : 'bg-red-100 text-red-800'}`}>
-                    {seller.status}
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    seller.status === 'active' || seller.verification_status === 'verified' 
+                      ? 'bg-green-100 text-green-800' 
+                      : seller.status === 'inactive' 
+                      ? 'bg-gray-100 text-gray-800' 
+                      : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {seller.status || seller.verification_status || 'pending'}
                   </span>
                 </div>
               </div>
@@ -167,17 +371,6 @@ const ManagerDashboard = () => {
           </div>
         </div>
       )}
-
-      {/* Seller Details Modal */}
-      <SellerDetailsModal
-        seller={selectedSeller}
-        isOpen={showSellerDetails}
-        onClose={() => { setShowSellerDetails(false); setSelectedSeller(null) }}
-      />
-
-      <div className="mt-8">
-        <ManagerUsersPage />
-      </div>
     </div>
   )
 }

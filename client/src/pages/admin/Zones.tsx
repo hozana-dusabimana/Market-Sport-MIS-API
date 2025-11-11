@@ -41,8 +41,11 @@ const Zones = () => {
   
   const allZones = data?.data || []
   // For managers, also filter by assigned_zones if available
-  const zones = user?.user_type === 'manager' && user?.profile?.assigned_zones
-    ? allZones.filter((z: Zone) => user.profile.assigned_zones.includes(z.zone_id!))
+  const managedZoneIds = user?.user_type === 'manager' && user?.profile?.assigned_zones
+    ? user.profile.assigned_zones
+    : []
+  const zones = managedZoneIds.length > 0
+    ? allZones.filter((z: Zone) => managedZoneIds.includes(z.zone_id!))
     : allZones
   
   const { data: zoneStats } = useQuery(
@@ -131,6 +134,19 @@ const Zones = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    // For managers, ensure they can only create/edit zones in their assigned zones
+    if (user?.user_type === 'manager') {
+      // When creating, assign zone to manager
+      if (!editingZone) {
+        formData.manager_id = user.userId
+      } else {
+        // When editing, ensure manager can only edit their own zones
+        if (!managedZoneIds.includes(editingZone.zone_id!)) {
+          toast.error('You can only edit zones assigned to you')
+          return
+        }
+      }
+    }
     if (editingZone) {
       updateMutation.mutate({ id: editingZone.zone_id!, zone: formData })
     } else {
@@ -221,24 +237,38 @@ const Zones = () => {
                       >
                         <Eye size={18} />
                       </button>
-                      <button
-                        onClick={() => handleEdit(zone)}
-                        className="text-primary-600 hover:text-primary-700"
-                        title="Edit"
-                      >
-                        <Edit size={18} />
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (confirm('Are you sure you want to delete this zone?')) {
-                            deleteMutation.mutate(zone.zone_id!)
-                          }
-                        }}
-                        className="text-red-600 hover:text-red-700"
-                        title="Delete"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                      {(user?.user_type !== 'manager' || managedZoneIds.includes(zone.zone_id!)) && (
+                        <>
+                          <button
+                            onClick={() => {
+                              if (user?.user_type === 'manager' && !managedZoneIds.includes(zone.zone_id!)) {
+                                toast.error('You can only edit zones assigned to you')
+                                return
+                              }
+                              handleEdit(zone)
+                            }}
+                            className="text-blue-600 hover:text-blue-700 mr-3"
+                            title="Edit"
+                          >
+                            <Edit size={18} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (user?.user_type === 'manager' && !managedZoneIds.includes(zone.zone_id!)) {
+                                toast.error('You can only delete zones assigned to you')
+                                return
+                              }
+                              if (confirm('Are you sure you want to delete this zone?')) {
+                                deleteMutation.mutate(zone.zone_id!)
+                              }
+                            }}
+                            className="text-red-600 hover:text-red-700"
+                            title="Delete"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
