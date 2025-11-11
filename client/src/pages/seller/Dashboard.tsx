@@ -10,41 +10,50 @@ import { format } from 'date-fns'
 const SellerDashboard = () => {
   const { user } = useAuthStore()
 
-  const { data: allocations } = useQuery(
-    'seller-allocations',
-    () => allocationService.getAll({ seller_id: user?.userId }),
-    { enabled: !!user?.userId }
+  // First get seller profile to get seller_id
+  const userId = user?.userId
+  const { data: sellerProfileResponse, isLoading: profileLoading } = useQuery(
+    ['seller-profile', userId],
+    () => sellerService.getAll({ id: userId }),
+    { enabled: !!userId && user?.user_type === 'seller', retry: false, onError: () => {} }
   )
 
-  const { data: payments } = useQuery(
-    'seller-payments',
-    () => paymentService.getSellerPayments(user?.userId || 0),
-    { enabled: !!user?.userId }
+  // Extract seller_id from response - backend returns sellers array when id is provided
+  const sellerProfile = sellerProfileResponse?.data?.sellers?.[0] || sellerProfileResponse?.data
+  const sellerId = sellerProfile?.seller_id || sellerProfile?.user_id || userId
+
+  const { data: allocationsData } = useQuery(
+    ['seller-allocations', sellerId],
+    () => allocationService.getAll({ seller_id: sellerId }),
+    { enabled: !!sellerId, retry: false, onError: () => {} }
   )
 
-  const { data: notifications } = useQuery(
+  const { data: paymentsData } = useQuery(
+    ['seller-payments', sellerId],
+    () => paymentService.getAll({ seller_id: sellerId }),
+    { enabled: !!sellerId, retry: false, onError: () => {} }
+  )
+
+  const { data: notificationsData } = useQuery(
     'seller-notifications',
-    () => notificationService.getAll({ user_id: user?.userId }),
-    { enabled: !!user?.userId }
-  )
-
-  // Get seller profile first, then statistics
-  const { data: sellerProfile } = useQuery(
-    'seller-profile',
-    () => sellerService.getByUserId(user?.userId || 0),
-    { enabled: !!user?.userId && user?.user_type === 'seller' }
+    () => notificationService.getUserNotifications(),
+    { enabled: !!userId, retry: false, onError: () => {} }
   )
 
   const { data: sellerStats } = useQuery(
-    'seller-statistics',
-    () => sellerService.getStatistics(sellerProfile?.data?.seller_id || 0),
-    { enabled: !!sellerProfile?.data?.seller_id }
+    ['seller-statistics', sellerId],
+    () => sellerService.getStatistics(sellerId),
+    { enabled: !!sellerId, retry: false, onError: () => {} }
   )
 
-  const activeAllocations = allocations?.data?.filter((a: any) => a.status === 'active') || []
-  const pendingPayments = payments?.data?.filter((p: any) => p.status === 'pending') || []
-  const unreadNotifications = notifications?.data?.filter((n: any) => !n.is_read) || []
-  const totalPaid = payments?.data?.reduce((sum: number, p: any) => {
+  const allocations = allocationsData?.data || []
+  const payments = paymentsData?.data || []
+  const notifications = notificationsData?.data || []
+
+  const activeAllocations = allocations.filter((a: any) => a.status === 'active') || []
+  const pendingPayments = payments.filter((p: any) => p.status === 'pending') || []
+  const unreadNotifications = notifications.filter((n: any) => n.status === 'unread' || !n.is_read) || []
+  const totalPaid = payments.reduce((sum: number, p: any) => {
     return sum + (p.status === 'completed' ? p.amount : 0)
   }, 0) || 0
 
@@ -143,9 +152,9 @@ const SellerDashboard = () => {
 
         <div className="card">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Payments</h2>
-          {payments?.data?.length > 0 ? (
+          {payments?.length > 0 ? (
             <div className="space-y-3">
-              {payments.data.slice(0, 5).map((payment: any) => (
+              {payments.slice(0, 5).map((payment: any) => (
                 <div key={payment.payment_id} className="border-b border-gray-200 pb-3">
                   <div className="flex justify-between items-center">
                     <div>

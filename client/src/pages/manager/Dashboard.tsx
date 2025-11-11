@@ -6,97 +6,64 @@ import { z } from 'zod'
 import { zoneService } from '../../services/zoneService'
 import { spaceService } from '../../services/spaceService'
 import { allocationService } from '../../services/allocationService'
-import { authService, RegisterData } from '../../services/authService'
-import { sellerService, Seller } from '../../services/sellerService'
-import { MapPin, Square, Users, TrendingUp, Plus, X, Eye } from 'lucide-react'
-import toast from 'react-hot-toast'
-import ManagerUsersPage from './Users'
-import { SellerDetailsModal } from '../../components/seller/SellerDetailsModal'
-
-// Full seller registration schema (from SellerRegistration page)
-const sellerRegistrationSchema = z.object({
-  username: z.string().min(3, 'Username must be at least 3 characters'),
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  phone_number: z.string().min(10, 'Invalid phone number'),
-  full_name: z.string().min(2, 'Full name is required'),
-  id_number: z.string().min(1, 'ID number is required'),
-  business_name: z.string().optional(),
-  business_type: z.string().optional(),
-  tin_number: z.string().optional(),
-  emergency_contact: z.string().optional(),
-  address: z.string().optional(),
-})
-type SellerRegistrationFormData = z.infer<typeof sellerRegistrationSchema>
+import { MapPin, Square, Users, TrendingUp } from 'lucide-react'
+import { useAuthStore } from '../../store/authStore'
 
 const ManagerDashboard = () => {
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [selectedSeller, setSelectedSeller] = useState<Seller | null>(null)
-  const [showSellerDetails, setShowSellerDetails] = useState(false)
-  const queryClient = useQueryClient()
+  const { user } = useAuthStore()
   
-  const { data: zones } = useQuery('zones', () => zoneService.getAll())
-  const { data: spaces } = useQuery('spaces', () => spaceService.getAll())
-  const { data: allocations } = useQuery('allocations', () => allocationService.getAll())
-  const { data: sellers } = useQuery('sellers', () => sellerService.getAll())
-  const { data: sellerStatusCount } = useQuery('seller-status-count', () => sellerService.countByStatus())
-
-  // Create seller form with full schema
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset: resetForm,
-  } = useForm<SellerRegistrationFormData>({
-    resolver: zodResolver(sellerRegistrationSchema),
+  const { data: zonesData } = useQuery('zones', () => zoneService.getAll(), {
+    retry: false,
+    onError: () => {},
+  })
+  const { data: spacesData } = useQuery('spaces', () => spaceService.getAll(), {
+    retry: false,
+    onError: () => {},
+  })
+  const { data: allocationsData } = useQuery('allocations', () => allocationService.getAll(), {
+    retry: false,
+    onError: () => {},
   })
 
-  const createSellerMutation = useMutation(
-    (data: SellerRegistrationFormData) => {
-      const registerData: RegisterData = {
-        ...data,
-        user_type: 'seller',
-        registration_date: new Date().toISOString().split('T')[0],
-      }
-      return authService.register(registerData)
-    },
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('manager-users')
-        toast.success('Seller registered successfully!')
-        setShowCreateModal(false)
-        resetForm()
-      },
-      onError: (error: unknown) => {
-        const message = 
-          typeof error === 'object' && error !== null && 'response' in error
-            ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
-            : undefined
-        toast.error(message || 'Failed to register seller')
-      },
-    }
-  )
+  const zones = zonesData?.data || []
+  const spaces = spacesData?.data || []
+  const allocations = allocationsData?.data || []
+  
+  // Filter zones by manager if user is a manager
+  const managedZoneIds = user?.user_type === 'manager' && user?.profile?.assigned_zones
+    ? user.profile.assigned_zones
+    : []
+  const managedZones = managedZoneIds.length > 0
+    ? zones.filter((z: any) => managedZoneIds.includes(z.zone_id))
+    : zones
 
-  const onCreateSeller = (data: SellerRegistrationFormData) => {
-    createSellerMutation.mutate(data)
-  }
+  // Filter spaces by managed zones
+  const managedSpaces = managedZoneIds.length > 0
+    ? spaces.filter((s: any) => managedZoneIds.includes(s.zone_id))
+    : spaces
+
+  // Filter allocations by managed zones (through spaces)
+  const managedSpaceIds = managedSpaces.map((s: any) => s.space_id)
+  const managedAllocations = managedZoneIds.length > 0
+    ? allocations.filter((a: any) => managedSpaceIds.includes(a.space_id))
+    : allocations
 
   const stats = [
     {
       name: 'Managed Zones',
-      value: zones?.data?.length || 0,
+      value: managedZones.length || 0,
       icon: MapPin,
       color: 'bg-blue-500',
     },
     {
       name: 'Total Spaces',
-      value: spaces?.data?.length || 0,
+      value: managedSpaces.length || 0,
       icon: Square,
       color: 'bg-green-500',
     },
     {
       name: 'Active Allocations',
-      value: allocations?.data?.filter((a: { status?: string }) => a.status === 'active')?.length || 0,
+      value: managedAllocations.filter((a: any) => a.status === 'active').length || 0,
       icon: Users,
       color: 'bg-purple-500',
     },
@@ -108,8 +75,8 @@ const ManagerDashboard = () => {
     },
   ]
 
-  const availableSpaces = spaces?.data?.filter((s: { status?: string }) => s.status === 'available')?.length || 0
-  const totalSpaces = spaces?.data?.length || 0
+  const availableSpaces = managedSpaces.filter((s: any) => s.status === 'available').length || 0
+  const totalSpaces = managedSpaces.length || 0
   const occupancyRate = totalSpaces > 0 ? ((totalSpaces - availableSpaces) / totalSpaces) * 100 : 0
 
   return (

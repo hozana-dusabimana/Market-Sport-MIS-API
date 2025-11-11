@@ -24,6 +24,8 @@ const UsersPage = () => {
       })
   )
 
+  const users = data?.data?.users || data?.data || []
+
   const { data: statistics } = useQuery('user-statistics', () => userService.getStatistics())
 
   const updateStatusMutation = useMutation(
@@ -158,7 +160,7 @@ const UsersPage = () => {
               </tr>
             </thead>
             <tbody>
-              {data?.data?.map((user: User) => (
+              {users?.map((user: User) => (
                 <tr key={user.user_id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="py-3 px-4 font-medium">{user.username}</td>
                   <td className="py-3 px-4">{user.email}</td>
@@ -214,7 +216,7 @@ const UsersPage = () => {
               ))}
             </tbody>
           </table>
-          {!data?.data?.length && (
+          {!users?.length && (
             <div className="text-center py-8 text-gray-500">No users found</div>
           )}
         </div>

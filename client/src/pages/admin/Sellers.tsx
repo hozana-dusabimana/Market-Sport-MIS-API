@@ -26,6 +26,8 @@ const Sellers = () => {
       })
   )
 
+  const sellers = data?.data?.sellers || data?.data || []
+
   const verifyMutation = useMutation(
     ({ id, status }: { id: number; status: 'verified' | 'rejected' }) =>
       sellerService.updateVerificationStatus(id, status),
@@ -150,7 +152,7 @@ const Sellers = () => {
               </tr>
             </thead>
             <tbody>
-              {data?.data?.map((seller: Seller) => (
+              {sellers?.map((seller: Seller) => (
                 <tr key={seller.seller_id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="py-3 px-4 font-medium">{seller.full_name}</td>
                   <td className="py-3 px-4">{seller.business_name || 'N/A'}</td>
@@ -199,7 +201,7 @@ const Sellers = () => {
               ))}
             </tbody>
           </table>
-          {!data?.data?.length && (
+          {!sellers?.length && (
             <div className="text-center py-8 text-gray-500">No sellers found</div>
           )}
         </div>

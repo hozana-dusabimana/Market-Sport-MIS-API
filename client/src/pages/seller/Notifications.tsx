@@ -8,11 +8,12 @@ const SellerNotifications = () => {
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
 
-  const { data: notifications, isLoading } = useQuery(
+  const { data: notificationsData, isLoading } = useQuery(
     'seller-notifications',
-    () => notificationService.getAll({ user_id: user?.userId }),
-    { enabled: !!user?.userId }
+    () => notificationService.getUserNotifications(),
+    { enabled: !!user?.userId, retry: false, onError: () => {} }
   )
+  const notifications = notificationsData?.data || []
 
   const markAsReadMutation = useMutation(
     (id: number) => notificationService.markAsRead(id),
@@ -33,7 +34,7 @@ const SellerNotifications = () => {
     return <div className="text-center py-12">Loading notifications...</div>
   }
 
-  const unreadCount = notifications?.data?.filter((n: any) => !n.is_read)?.length || 0
+  const unreadCount = notifications?.filter((n: any) => n.status === 'unread' || !n.is_read)?.length || 0
 
   return (
     <div>
@@ -52,19 +53,21 @@ const SellerNotifications = () => {
 
       <div className="card">
         <div className="space-y-4">
-          {notifications?.data?.length > 0 ? (
-            notifications.data.map((notification: any) => (
+          {notifications?.length > 0 ? (
+            notifications.map((notification: any) => {
+              const isUnread = notification.status === 'unread' || !notification.is_read
+              return (
               <div
                 key={notification.notification_id}
                 className={`p-4 rounded-lg border-l-4 ${
-                  notification.type === 'info'
-                    ? 'bg-blue-50 border-blue-500'
-                    : notification.type === 'success'
+                  notification.notification_type === 'payment'
                     ? 'bg-green-50 border-green-500'
-                    : notification.type === 'warning'
+                    : notification.notification_type === 'allocation'
+                    ? 'bg-blue-50 border-blue-500'
+                    : notification.notification_type === 'verification'
                     ? 'bg-yellow-50 border-yellow-500'
-                    : 'bg-red-50 border-red-500'
-                } ${!notification.is_read ? 'font-semibold' : ''}`}
+                    : 'bg-gray-50 border-gray-500'
+                } ${isUnread ? 'font-semibold' : ''}`}
               >
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
@@ -75,17 +78,19 @@ const SellerNotifications = () => {
                         format(new Date(notification.created_at), 'MMM dd, yyyy HH:mm')}
                     </p>
                   </div>
-                  {!notification.is_read && (
+                  {isUnread && (
                     <button
                       onClick={() => markAsReadMutation.mutate(notification.notification_id)}
                       className="ml-4 text-primary-600 hover:text-primary-700"
+                      title="Mark as read"
                     >
                       <Check size={20} />
                     </button>
                   )}
                 </div>
               </div>
-            ))
+              )
+            })
           ) : (
             <div className="text-center py-12">
               <Bell className="w-16 h-16 text-gray-400 mx-auto mb-4" />

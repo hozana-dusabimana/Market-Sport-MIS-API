@@ -1,15 +1,21 @@
 import api from './api'
 
 export interface Seller {
-  id: number
+  seller_id?: number
   user_id: number
+  full_name?: string
+  id_number?: string
   business_name: string
   business_type: string
-  registration_date: string
-  status: 'active' | 'inactive' | 'suspended'
-  address: string
-  phone_number: string
-  email: string
+  tin_number?: string
+  emergency_contact?: string
+  address?: string
+  registration_date?: string
+  verification_status?: 'pending' | 'verified' | 'rejected'
+  email?: string
+  phone_number?: string
+  username?: string
+  status?: 'active' | 'inactive' | 'suspended'
   user?: {
     username: string
     email: string
@@ -27,16 +33,20 @@ export interface Seller {
 }
 
 export interface CreateSellerData {
-  username: string
-  email: string
-  password: string
+  user_id: number
+  full_name: string
+  id_number: string
   business_name: string
   business_type: string
-  address: string
-  phone_number: string
+  tin_number?: string
+  emergency_contact?: string
+  address?: string
+  registration_date?: string
+  verification_status?: 'pending' | 'verified' | 'rejected'
 }
 
 export const sellerService = {
+<<<<<<< HEAD
   getAll: async (params?: Record<string, unknown>) => {
     const response = await api.get<{ success: boolean; data: Seller[] }>('/sellers', { params })
     return response.data.data
@@ -65,24 +75,69 @@ export const sellerService = {
       `/sellers/${id}/profile`,
       data
     )
+=======
+  getAll: async (params?: {
+    verification_status?: string
+    business_type?: string
+    search?: string
+    page?: number
+    limit?: number
+    id?: number
+  }) => {
+    const response = await api.get('/sellers', { params })
+    return response.data
+  },
+
+  getById: async (id: number) => {
+    const response = await api.get(`/sellers/${id}`)
+    return response.data
+  },
+
+  getByUserId: async (userId: number) => {
+    // First get all sellers and find by user_id, or use search
+    const response = await api.get('/sellers', { params: { id: userId } })
+    return response.data
+  },
+
+  create: async (data: CreateSellerData) => {
+    const response = await api.post('/sellers', data)
+    return response.data
+  },
+
+  update: async (id: number, data: Partial<Seller>) => {
+    const response = await api.put(`/sellers/${id}`, data)
+    return response.data
+  },
+
+  updateVerificationStatus: async (id: number, status: 'pending' | 'verified' | 'rejected') => {
+    const response = await api.patch(`/sellers/verification/${id}`, { status })
+>>>>>>> ca4e2593ea3a314494d2db83a1ffa16386389184
     return response.data
   },
 
   delete: async (id: number) => {
+<<<<<<< HEAD
     const response = await api.delete<{ success: boolean }>(`/sellers/${id}`)
+=======
+    const response = await api.delete(`/sellers/${id}`)
+>>>>>>> ca4e2593ea3a314494d2db83a1ffa16386389184
     return response.data
   },
 
-  // Get seller's allocations history
   getAllocations: async (id: number) => {
+<<<<<<< HEAD
     const response = await api.get<{ success: boolean; data: Seller['allocations'] }>(
       `/sellers/${id}/allocations`
     )
     return response.data.data
+=======
+    const response = await api.get(`/sellers/${id}/allocations`)
+    return response.data
+>>>>>>> ca4e2593ea3a314494d2db83a1ffa16386389184
   },
 
-  // Get seller's payment history
   getPayments: async (id: number, params?: { start_date?: string; end_date?: string }) => {
+<<<<<<< HEAD
     const response = await api.get<{
       success: boolean
       data: {
@@ -110,4 +165,32 @@ export const sellerService = {
     const response = await api.get<{ success: boolean; data: Record<string, unknown> }>(`/sellers/${id}/statistics`)
     return response.data.data
   }
+=======
+    const response = await api.get(`/sellers/${id}/payments`, { params })
+    return response.data
+  },
+
+  getStatistics: async (id: number) => {
+    const response = await api.get(`/sellers/${id}/stats`)
+    return response.data
+  },
+
+  getCountByStatus: async () => {
+    const response = await api.get('/sellers/counts')
+    return response.data
+  },
+
+  // Legacy methods for compatibility
+  getOne: async (id: number) => {
+    return await sellerService.getById(id)
+  },
+
+  updateStatus: async (id: number, status: Seller['status']) => {
+    return await sellerService.update(id, { status })
+  },
+
+  updateProfile: async (id: number, data: Partial<Seller>) => {
+    return await sellerService.update(id, data)
+  },
+>>>>>>> ca4e2593ea3a314494d2db83a1ffa16386389184
 }
