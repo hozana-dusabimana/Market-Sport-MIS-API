@@ -144,7 +144,7 @@ const Allocations = () => {
             <h2 className="text-2xl font-bold mb-4">Create New Allocation</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="label">Seller ID</label>
+                <label className="label">Seller ID *</label>
                 <input
                   type="number"
                   value={formData.seller_id || ''}
@@ -154,7 +154,7 @@ const Allocations = () => {
                 />
               </div>
               <div>
-                <label className="label">Space</label>
+                <label className="label">Space *</label>
                 <select
                   value={formData.space_id}
                   onChange={(e) => {
@@ -177,7 +177,7 @@ const Allocations = () => {
                 </select>
               </div>
               <div>
-                <label className="label">Start Date</label>
+                <label className="label">Start Date *</label>
                 <input
                   type="date"
                   value={formData.start_date}
@@ -187,7 +187,7 @@ const Allocations = () => {
                 />
               </div>
               <div>
-                <label className="label">Monthly Rate ($)</label>
+                <label className="label">Monthly Rate ($) *</label>
                 <input
                   type="number"
                   step="0.01"

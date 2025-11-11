@@ -31,6 +31,19 @@ const Payments = () => {
     },
   })
 
+  const updateStatusMutation = useMutation(
+    ({ id, status }: { id: number; status: string }) => paymentService.updateStatus(id, status),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('payments')
+        toast.success('Payment status updated successfully')
+      },
+      onError: (error: any) => {
+        toast.error(error.response?.data?.message || 'Failed to update payment status')
+      },
+    }
+  )
+
   const resetForm = () => {
     setFormData({
       allocation_id: 0,
@@ -92,8 +105,14 @@ const Payments = () => {
                     {format(new Date(payment.payment_date), 'MMM dd, yyyy')}
                   </td>
                   <td className="py-3 px-4">
-                    <span
-                      className={`px-2 py-1 rounded text-xs font-medium ${
+                    <select
+                      value={payment.status}
+                      onChange={(e) => {
+                        if (confirm(`Change payment status to ${e.target.value}?`)) {
+                          updateStatusMutation.mutate({ id: payment.payment_id!, status: e.target.value })
+                        }
+                      }}
+                      className={`px-2 py-1 rounded text-xs font-medium border-0 ${
                         payment.status === 'completed'
                           ? 'bg-green-100 text-green-800'
                           : payment.status === 'pending'
@@ -103,25 +122,33 @@ const Payments = () => {
                           : 'bg-gray-100 text-gray-800'
                       }`}
                     >
-                      {payment.status}
-                    </span>
+                      <option value="pending">Pending</option>
+                      <option value="completed">Completed</option>
+                      <option value="failed">Failed</option>
+                      <option value="refunded">Refunded</option>
+                    </select>
                   </td>
                   <td className="py-3 px-4">
-                    <button
-                      onClick={() => {
-                        // Generate receipt
-                        paymentService.generateReceipt(payment.payment_id!).then((blob) => {
-                          const url = window.URL.createObjectURL(blob)
-                          const a = document.createElement('a')
-                          a.href = url
-                          a.download = `receipt-${payment.payment_id}.pdf`
-                          a.click()
-                        })
-                      }}
-                      className="text-primary-600 hover:text-primary-700"
-                    >
-                      <Download size={18} />
-                    </button>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => {
+                          // Generate receipt
+                          paymentService.generateReceipt(payment.payment_id!).then((blob) => {
+                            const url = window.URL.createObjectURL(blob)
+                            const a = document.createElement('a')
+                            a.href = url
+                            a.download = `receipt-${payment.payment_id}.pdf`
+                            a.click()
+                          }).catch(() => {
+                            toast.error('Failed to generate receipt')
+                          })
+                        }}
+                        className="text-primary-600 hover:text-primary-700"
+                        title="Download Receipt"
+                      >
+                        <Download size={18} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -136,7 +163,7 @@ const Payments = () => {
             <h2 className="text-2xl font-bold mb-4">Record Payment</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="label">Allocation ID</label>
+                <label className="label">Allocation ID *</label>
                 <input
                   type="number"
                   value={formData.allocation_id || ''}
@@ -146,7 +173,7 @@ const Payments = () => {
                 />
               </div>
               <div>
-                <label className="label">Seller ID</label>
+                <label className="label">Seller ID *</label>
                 <input
                   type="number"
                   value={formData.seller_id || ''}
@@ -156,7 +183,7 @@ const Payments = () => {
                 />
               </div>
               <div>
-                <label className="label">Amount ($)</label>
+                <label className="label">Amount ($) *</label>
                 <input
                   type="number"
                   step="0.01"
@@ -167,11 +194,12 @@ const Payments = () => {
                 />
               </div>
               <div>
-                <label className="label">Payment Method</label>
+                <label className="label">Payment Method *</label>
                 <select
                   value={formData.payment_method}
                   onChange={(e) => setFormData({ ...formData, payment_method: e.target.value as any })}
                   className="input"
+                  required
                 >
                   <option value="mobile_money">Mobile Money</option>
                   <option value="bank_transfer">Bank Transfer</option>
@@ -181,17 +209,18 @@ const Payments = () => {
               </div>
               {formData.payment_method === 'mobile_money' && (
                 <div>
-                  <label className="label">Phone Number</label>
+                  <label className="label">Phone Number *</label>
                   <input
                     type="tel"
                     value={formData.phone_number || ''}
                     onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
                     className="input"
+                    required
                   />
                 </div>
               )}
               <div>
-                <label className="label">Payment Date</label>
+                <label className="label">Payment Date *</label>
                 <input
                   type="date"
                   value={formData.payment_date}
@@ -201,11 +230,12 @@ const Payments = () => {
                 />
               </div>
               <div>
-                <label className="label">Status</label>
+                <label className="label">Status *</label>
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
                   className="input"
+                  required
                 >
                   <option value="pending">Pending</option>
                   <option value="completed">Completed</option>

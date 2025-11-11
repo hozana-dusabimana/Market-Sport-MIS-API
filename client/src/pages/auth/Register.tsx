@@ -104,11 +104,12 @@ const Register = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    User Type
+                    User Type *
                   </label>
                   <select
                     {...register('user_type')}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
+                    required
                   >
                     <option value="seller">Seller</option>
                     <option value="manager">Manager</option>
@@ -125,6 +126,7 @@ const Register = () => {
                     {...register('full_name')}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
                     placeholder="Enter your full name"
+                    required
                   />
                   {errors.full_name && (
                     <p className="mt-1 text-sm text-red-600">{errors.full_name.message}</p>
@@ -140,6 +142,7 @@ const Register = () => {
                     {...register('username')}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
                     placeholder="Choose a username"
+                    required
                   />
                   {errors.username && (
                     <p className="mt-1 text-sm text-red-600">{errors.username.message}</p>
@@ -155,6 +158,7 @@ const Register = () => {
                     {...register('email')}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
                     placeholder="Enter your email"
+                    required
                   />
                   {errors.email && (
                     <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
@@ -170,6 +174,7 @@ const Register = () => {
                     {...register('phone_number')}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
                     placeholder="Enter your phone number"
+                    required
                   />
                   {errors.phone_number && (
                     <p className="mt-1 text-sm text-red-600">{errors.phone_number.message}</p>
@@ -185,6 +190,7 @@ const Register = () => {
                     {...register('id_number')}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
                     placeholder="Enter your ID number"
+                    required
                   />
                   {errors.id_number && (
                     <p className="mt-1 text-sm text-red-600">{errors.id_number.message}</p>
@@ -201,6 +207,7 @@ const Register = () => {
                       {...register('password')}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all pr-12"
                       placeholder="Create a password"
+                      required
                     />
                     <button
                       type="button"

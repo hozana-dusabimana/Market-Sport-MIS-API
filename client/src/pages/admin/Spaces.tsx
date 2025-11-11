@@ -3,11 +3,17 @@ import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { spaceService, Space } from '../../services/spaceService'
 import { zoneService } from '../../services/zoneService'
 import toast from 'react-hot-toast'
-import { Plus, Edit, Trash2, Square } from 'lucide-react'
+import { Plus, Edit, Trash2, Square, Search, Eye, Filter } from 'lucide-react'
 
 const Spaces = () => {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingSpace, setEditingSpace] = useState<Space | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [zoneFilter, setZoneFilter] = useState<string>('all')
+  const [typeFilter, setTypeFilter] = useState<string>('all')
+  const [selectedSpace, setSelectedSpace] = useState<Space | null>(null)
+  const [showDetails, setShowDetails] = useState(false)
   const [formData, setFormData] = useState<Partial<Space>>({
     zone_id: 0,
     space_code: '',
@@ -17,8 +23,29 @@ const Spaces = () => {
   })
 
   const queryClient = useQueryClient()
-  const { data: spaces, isLoading } = useQuery('spaces', () => spaceService.getAll())
+  const { data: spaces, isLoading } = useQuery(
+    ['spaces', statusFilter, zoneFilter, typeFilter, searchTerm],
+    () =>
+      spaceService.getAll({
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        zone_id: zoneFilter !== 'all' ? parseInt(zoneFilter) : undefined,
+        space_type: typeFilter !== 'all' ? typeFilter : undefined,
+        search: searchTerm || undefined,
+      })
+  )
   const { data: zones } = useQuery('zones', () => zoneService.getAll())
+  
+  const { data: currentAllocation } = useQuery(
+    ['space-allocation', selectedSpace?.space_id],
+    () => spaceService.getCurrentAllocation(selectedSpace?.space_id!),
+    { enabled: !!selectedSpace?.space_id && showDetails }
+  )
+  
+  const { data: allocationHistory } = useQuery(
+    ['space-allocation-history', selectedSpace?.space_id],
+    () => spaceService.getAllocationHistory(selectedSpace?.space_id!),
+    { enabled: !!selectedSpace?.space_id && showDetails }
+  )
 
   const createMutation = useMutation((space: Space) => spaceService.create(space), {
     onSuccess: () => {
@@ -58,6 +85,19 @@ const Spaces = () => {
     },
   })
 
+  const updateStatusMutation = useMutation(
+    ({ id, status }: { id: number; status: string }) => spaceService.updateStatus(id, status),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('spaces')
+        toast.success('Space status updated successfully')
+      },
+      onError: (error: any) => {
+        toast.error(error.response?.data?.message || 'Failed to update space status')
+      },
+    }
+  )
+
   const resetForm = () => {
     setFormData({
       zone_id: 0,
@@ -72,6 +112,11 @@ const Spaces = () => {
     setEditingSpace(space)
     setFormData(space)
     setIsModalOpen(true)
+  }
+
+  const handleViewDetails = async (space: Space) => {
+    setSelectedSpace(space)
+    setShowDetails(true)
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -127,8 +172,14 @@ const Spaces = () => {
                     <td className="py-3 px-4 capitalize">{space.space_type}</td>
                     <td className="py-3 px-4">${space.monthly_rate}</td>
                     <td className="py-3 px-4">
-                      <span
-                        className={`px-2 py-1 rounded text-xs font-medium ${
+                      <select
+                        value={space.status}
+                        onChange={(e) => {
+                          if (confirm(`Change space status to ${e.target.value}?`)) {
+                            updateStatusMutation.mutate({ id: space.space_id!, status: e.target.value })
+                          }
+                        }}
+                        className={`px-2 py-1 rounded text-xs font-medium border-0 ${
                           space.status === 'available'
                             ? 'bg-green-100 text-green-800'
                             : space.status === 'occupied'
@@ -138,14 +189,25 @@ const Spaces = () => {
                             : 'bg-gray-100 text-gray-800'
                         }`}
                       >
-                        {space.status}
-                      </span>
+                        <option value="available">Available</option>
+                        <option value="occupied">Occupied</option>
+                        <option value="maintenance">Maintenance</option>
+                        <option value="reserved">Reserved</option>
+                      </select>
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex space-x-2">
                         <button
+                          onClick={() => handleViewDetails(space)}
+                          className="text-primary-600 hover:text-primary-700"
+                          title="View Details"
+                        >
+                          <Eye size={18} />
+                        </button>
+                        <button
                           onClick={() => handleEdit(space)}
                           className="text-primary-600 hover:text-primary-700"
+                          title="Edit"
                         >
                           <Edit size={18} />
                         </button>
@@ -156,6 +218,7 @@ const Spaces = () => {
                             }
                           }}
                           className="text-red-600 hover:text-red-700"
+                          title="Delete"
                         >
                           <Trash2 size={18} />
                         </button>
@@ -177,7 +240,7 @@ const Spaces = () => {
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="label">Zone</label>
+                <label className="label">Zone *</label>
                 <select
                   value={formData.zone_id}
                   onChange={(e) => setFormData({ ...formData, zone_id: parseInt(e.target.value) })}
@@ -193,7 +256,7 @@ const Spaces = () => {
                 </select>
               </div>
               <div>
-                <label className="label">Space Code</label>
+                <label className="label">Space Code *</label>
                 <input
                   type="text"
                   value={formData.space_code}
@@ -203,11 +266,12 @@ const Spaces = () => {
                 />
               </div>
               <div>
-                <label className="label">Space Type</label>
+                <label className="label">Space Type *</label>
                 <select
                   value={formData.space_type}
                   onChange={(e) => setFormData({ ...formData, space_type: e.target.value as any })}
                   className="input"
+                  required
                 >
                   <option value="stall">Stall</option>
                   <option value="kiosk">Kiosk</option>
@@ -215,7 +279,7 @@ const Spaces = () => {
                 </select>
               </div>
               <div>
-                <label className="label">Monthly Rate ($)</label>
+                <label className="label">Monthly Rate ($) *</label>
                 <input
                   type="number"
                   step="0.01"
@@ -226,11 +290,12 @@ const Spaces = () => {
                 />
               </div>
               <div>
-                <label className="label">Status</label>
+                <label className="label">Status *</label>
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
                   className="input"
+                  required
                 >
                   <option value="available">Available</option>
                   <option value="occupied">Occupied</option>

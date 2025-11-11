@@ -3,7 +3,9 @@ import { zoneService } from '../../services/zoneService'
 import { spaceService } from '../../services/spaceService'
 import { paymentService } from '../../services/paymentService'
 import { allocationService } from '../../services/allocationService'
-import { MapPin, Square, CreditCard, Users, TrendingUp, DollarSign } from 'lucide-react'
+import { userService } from '../../services/userService'
+import { sellerService } from '../../services/sellerService'
+import { MapPin, Square, CreditCard, Users, TrendingUp, DollarSign, UserCheck } from 'lucide-react'
 import { format } from 'date-fns'
 
 const AdminDashboard = () => {
@@ -16,6 +18,8 @@ const AdminDashboard = () => {
     })
   )
   const { data: allocations } = useQuery('allocations', () => allocationService.getAll())
+  const { data: userStats } = useQuery('user-statistics', () => userService.getStatistics())
+  const { data: sellerStatusCount } = useQuery('seller-status-count', () => sellerService.countByStatus())
 
   const stats = [
     {
@@ -70,6 +74,51 @@ const AdminDashboard = () => {
           )
         })}
       </div>
+
+      {userStats?.data && (
+        <div className="card mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">User Statistics</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {userStats.data.map((stat: any) => (
+              <div key={stat.user_type} className="bg-gray-50 p-4 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-600 capitalize">{stat.user_type}s</span>
+                  <UserCheck className="w-5 h-5 text-gray-400" />
+                </div>
+                <p className="text-2xl font-bold text-gray-900">{stat.total || 0}</p>
+                <div className="flex space-x-4 mt-2 text-xs">
+                  <span className="text-green-600">Active: {stat.active || 0}</span>
+                  <span className="text-red-600">Suspended: {stat.suspended || 0}</span>
+                  <span className="text-gray-600">Inactive: {stat.inactive || 0}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {sellerStatusCount?.data && (
+        <div className="card mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Seller Verification Status</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {sellerStatusCount.data.map((stat: any) => (
+              <div key={stat.verification_status} className="bg-gray-50 p-4 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-600 capitalize">{stat.verification_status}</span>
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    stat.verification_status === 'verified' ? 'bg-green-100 text-green-800' :
+                    stat.verification_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {stat.verification_status}
+                  </span>
+                </div>
+                <p className="text-2xl font-bold text-gray-900">{stat.count || 0}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card">
