@@ -7,42 +7,52 @@ import { format } from 'date-fns'
 
 const SellerPayments = () => {
   const { user } = useAuthStore()
-
-  // First get seller profile to get seller_id
   const userId = user?.userId
+
+  // Fetch seller profile
   const { data: sellerProfileResponse, isLoading: profileLoading } = useQuery(
     ['seller-profile', userId],
     () => sellerService.getAll({ id: userId }),
     { enabled: !!userId && user?.user_type === 'seller', retry: false, onError: () => {} }
   )
 
-  // Extract seller_id from response
   const sellerProfile = sellerProfileResponse?.data?.sellers?.[0] || sellerProfileResponse?.data
   const sellerId = sellerProfile?.seller_id || sellerProfile?.user_id || userId
 
+  // Fetch payments
   const { data: paymentsData, isLoading: paymentsLoading } = useQuery(
     ['seller-payments', sellerId],
     () => paymentService.getAll({ seller_id: sellerId }),
     { enabled: !!sellerId, retry: false, onError: () => {} }
   )
+
   const payments = paymentsData?.data || []
 
   if (profileLoading || paymentsLoading) {
     return <div className="text-center py-12">Loading payments...</div>
   }
 
+  // Ensure all amounts are numbers
   const totalPaid = payments.reduce((sum: number, p: any) => {
-    return sum + (p.status === 'completed' ? p.amount : 0)
-  }, 0) || 0
+    const amount = Number(p.amount) || 0
+    return sum + (p.status === 'completed' ? amount : 0)
+  }, 0)
 
   const pendingAmount = payments.reduce((sum: number, p: any) => {
-    return sum + (p.status === 'pending' ? p.amount : 0)
-  }, 0) || 0
+    const amount = Number(p.amount) || 0
+    return sum + (p.status === 'pending' ? amount : 0)
+  }, 0)
+
+ const totalRevenue = payments.reduce((sum: number, p: any) => {
+  return sum + (Number(p.amount) || 0)
+}, 0)
+
 
   return (
     <div>
       <h1 className="text-3xl font-bold text-gray-900 mb-6">My Payments</h1>
 
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div className="card">
           <div className="flex items-center justify-between">
@@ -67,8 +77,21 @@ const SellerPayments = () => {
             </div>
           </div>
         </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Revenue</p>
+              <p className="text-2xl font-bold text-gray-900 mt-2">${totalRevenue.toFixed(2)}</p>
+            </div>
+            <div className="p-3 bg-blue-100 rounded-lg">
+              <CreditCard className="w-6 h-6 text-blue-600" />
+            </div>
+          </div>
+        </div>
       </div>
 
+      {/* Payment History */}
       <div className="card">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Payment History</h2>
         <div className="overflow-x-auto">
@@ -84,11 +107,11 @@ const SellerPayments = () => {
               </tr>
             </thead>
             <tbody>
-              {payments?.length > 0 ? (
+              {payments.length > 0 ? (
                 payments.map((payment: any) => (
                   <tr key={payment.payment_id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-3 px-4">#{payment.payment_id}</td>
-                    <td className="py-3 px-4 font-medium">${payment.amount}</td>
+                    <td className="py-3 px-4 font-medium">${Number(payment.amount || 0).toFixed(2)}</td>
                     <td className="py-3 px-4 capitalize">{payment.payment_method.replace('_', ' ')}</td>
                     <td className="py-3 px-4">
                       {format(new Date(payment.payment_date), 'MMM dd, yyyy')}
@@ -144,5 +167,3 @@ const SellerPayments = () => {
 }
 
 export default SellerPayments
-
-
