@@ -1,5 +1,5 @@
-const mysql = require('mysql2');
-const config = require('./config');
+import mysql from 'mysql2';
+import config from './config.js';
 
 const pool = mysql.createPool({
   host: config.database.host,
@@ -24,4 +24,4 @@ promisePool.query('SELECT 1')
     process.exit(1);
   });
 
-module.exports = promisePool;
+export default promisePool;

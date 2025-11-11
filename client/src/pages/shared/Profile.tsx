@@ -119,20 +119,22 @@ const Profile = () => {
               </div>
 
               <div>
-                <label className="label">Phone Number</label>
+                <label className="label">Phone Number *</label>
                 <input
                   type="tel"
                   {...registerProfile('phone_number')}
                   className="input"
+                  required
                 />
               </div>
 
               <div>
-                <label className="label">Full Name</label>
+                <label className="label">Full Name *</label>
                 <input
                   type="text"
                   {...registerProfile('full_name')}
                   className="input"
+                  required
                 />
               </div>
 

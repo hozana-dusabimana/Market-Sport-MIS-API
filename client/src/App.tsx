@@ -3,6 +3,8 @@ import { useAuthStore } from './store/authStore'
 import Home from './pages/Home'
 import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
+import ForgotPassword from './pages/auth/ForgotPassword'
+import ResetPassword from './pages/auth/ResetPassword'
 import AdminDashboard from './pages/admin/Dashboard'
 import SellerDashboard from './pages/seller/Dashboard'
 import ManagerDashboard from './pages/manager/Dashboard'
@@ -13,6 +15,8 @@ import Payments from './pages/admin/Payments'
 import Reports from './pages/admin/Reports'
 import Notifications from './pages/admin/Notifications'
 import SellerRegistration from './pages/admin/SellerRegistration'
+import Sellers from './pages/admin/Sellers'
+import Users from './pages/admin/Users'
 import SellerSpaces from './pages/seller/Spaces'
 import SellerPayments from './pages/seller/Payments'
 import SellerNotifications from './pages/seller/Notifications'
@@ -30,7 +34,10 @@ function App() {
       <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" />} />
       <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to="/dashboard" />} />
       
-      {/* Protected routes */}
+  <Route path="/forgot-password" element={!isAuthenticated ? <ForgotPassword /> : <Navigate to="/forgot-password" />} />
+  <Route path="/reset-password" element={!isAuthenticated ? <ResetPassword /> : <Navigate to="/dashboard" />} />
+
+  {/* Protected routes */}
       <Route
         element={
           <ProtectedRoute>
@@ -50,6 +57,8 @@ function App() {
           <>
             <Route path="zones" element={<Zones />} />
             <Route path="spaces" element={<Spaces />} />
+            <Route path="sellers" element={<Sellers />} />
+            <Route path="users" element={<Users />} />
             <Route path="allocations" element={<Allocations />} />
             <Route path="payments" element={<Payments />} />
             <Route path="reports" element={<Reports />} />

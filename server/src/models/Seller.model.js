@@ -1,4 +1,4 @@
-const db = require('../config/database');
+import db from '../config/database.js';
 
 class Seller {
   // Find seller by user ID
@@ -233,4 +233,4 @@ class Seller {
   }
 }
 
-module.exports = Seller;
+export default Seller;

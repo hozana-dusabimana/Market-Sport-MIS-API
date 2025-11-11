@@ -1,5 +1,6 @@
 {
   "name": "market-spoton-backend",
+  "type": "module",
   "version": "1.0.0",
   "description": "Market Space Management System Backend with Migrations",
   "main": "server.js",

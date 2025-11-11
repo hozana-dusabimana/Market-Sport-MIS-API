@@ -1,4 +1,4 @@
-const { body, param, query, validationResult } = require('express-validator');
+import { body, param, query, validationResult } from 'express-validator';
 
 // Handle validation errors
 const handleValidationErrors = (req, res, next) => {
@@ -89,6 +89,41 @@ const validateChangePassword = [
     .custom((value, { req }) => {
       if (value === req.body.current_password) {
         throw new Error('New password must be different from current password');
+      }
+      return true;
+    }),
+  
+  handleValidationErrors
+];
+
+// Forgot password validation
+const validateForgotPassword = [
+  body('email')
+    .trim()
+    .isEmail()
+    .withMessage('Must be a valid email address')
+    .normalizeEmail(),
+  
+  handleValidationErrors
+];
+
+// Reset password validation
+const validateResetPassword = [
+  body('resetToken')
+    .trim()
+    .notEmpty()
+    .withMessage('Reset token is required'),
+  
+  body('new_password')
+    .isLength({ min: 6 })
+    .withMessage('New password must be at least 6 characters long'),
+  
+  body('confirm_password')
+    .isLength({ min: 6 })
+    .withMessage('Confirm password must be at least 6 characters long')
+    .custom((value, { req }) => {
+      if (value !== req.body.new_password) {
+        throw new Error('Passwords do not match');
       }
       return true;
     }),
@@ -291,10 +326,12 @@ const validateDateRange = [
   handleValidationErrors
 ];
 
-module.exports = {
+export {
   validateRegistration,
   validateLogin,
   validateChangePassword,
+  validateForgotPassword,
+  validateResetPassword,
   validateZone,
   validateSpace,
   validateAllocation,

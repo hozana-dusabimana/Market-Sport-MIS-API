@@ -1,7 +1,7 @@
 // ============================================
 // src/models/Zone.model.js
 // ============================================
-const db = require('../config/database');
+import db from '../config/database.js';
 
 class Zone {
   static async findAll(filters = {}) {
@@ -340,4 +340,4 @@ class Space {
   }
 }
 
-module.exports = { Zone, Space };
+export { Zone, Space };

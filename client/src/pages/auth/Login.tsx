@@ -85,13 +85,14 @@ const Login = () => {
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Username or Email
+                  Username or Email *
                 </label>
                 <input
                   type="text"
                   {...register('username')}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
                   placeholder="Enter your username or email"
+                  required
                 />
                 {errors.username && (
                   <p className="mt-1 text-sm text-red-600">{errors.username.message}</p>
@@ -100,10 +101,11 @@ const Login = () => {
 
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-gray-700">Password</label>
+                  <label className="block text-sm font-medium text-gray-700">Password *</label>
                   <Link
-                    to="#"
+                    to="/forgot-password"
                     className="text-sm text-teal-600 hover:text-teal-700 font-medium"
+                    aria-label="Forgot password"
                   >
                     Forgot Password?
                   </Link>
@@ -114,6 +116,7 @@ const Login = () => {
                     {...register('password')}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all pr-12"
                     placeholder="Enter your password"
+                    required
                   />
                   <button
                     type="button"

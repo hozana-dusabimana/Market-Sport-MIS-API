@@ -1,7 +1,11 @@
-const mysql = require('mysql2/promise');
-const fs = require('fs').promises;
-const path = require('path');
-require('dotenv').config();
+import mysql from 'mysql2/promise';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { pathToFileURL } from 'url';
+import 'dotenv/config';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const config = {
   host: process.env.DB_HOST || 'localhost',
@@ -54,8 +58,10 @@ class MigrationManager {
 
   async runMigration(file) {
     console.log(`Running migration: ${file}`);
-    const migration = require(path.join(this.migrationsPath, file));
-    
+    const migrationPath = path.join(this.migrationsPath, file);
+    const migrationModule = await import(pathToFileURL(migrationPath).href);
+    const migration = migrationModule.default ?? migrationModule;
+
     if (migration.up) {
       await migration.up(this.connection);
       await this.connection.query(
@@ -68,8 +74,10 @@ class MigrationManager {
 
   async rollbackMigration(file) {
     console.log(`Rolling back migration: ${file}`);
-    const migration = require(path.join(this.migrationsPath, file));
-    
+    const migrationPath = path.join(this.migrationsPath, file);
+    const migrationModule = await import(pathToFileURL(migrationPath).href);
+    const migration = migrationModule.default ?? migrationModule;
+
     if (migration.down) {
       await migration.down(this.connection);
       await this.connection.query(
@@ -86,9 +94,15 @@ class MigrationManager {
     
     for (const file of seederFiles) {
       console.log(`Running seeder: ${file}`);
-      const seeder = require(path.join(this.seedersPath, file));
+      const seederPath = path.join(this.seedersPath, file);
+      const seederModule = await import(pathToFileURL(seederPath).href);
+      const seeder = seederModule.default ?? seederModule;
       if (seeder.seed) {
         await seeder.seed(this.connection);
+        console.log(`✓ Seeder completed: ${file}`);
+      } else if (typeof seeder === 'function') {
+        // support exported function
+        await seeder(this.connection);
         console.log(`✓ Seeder completed: ${file}`);
       }
     }
