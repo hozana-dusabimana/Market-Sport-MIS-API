@@ -1,15 +1,12 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { zoneService, Zone } from '../../services/zoneService'
+import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
-<<<<<<< HEAD
-import { Plus, Edit, Trash2, MapPin } from 'lucide-react'
-import { demoZones, useDemoData } from '../../utils/demoData'
-=======
-import { Plus, Edit, Trash2, MapPin, Search, Eye } from 'lucide-react'
->>>>>>> 79f519dd79e06348c0ab26c810f91bf9e848dd1c
+import { Plus, Edit, Trash2, Search, Eye } from 'lucide-react'
 
 const Zones = () => {
+  const { user } = useAuthStore()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingZone, setEditingZone] = useState<Zone | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -21,34 +18,55 @@ const Zones = () => {
     zone_code: '',
     description: '',
     location: '',
+    manager_id: undefined,
+    total_spaces: 0,
     status: 'active',
   })
 
   const queryClient = useQueryClient()
-<<<<<<< HEAD
-  const { data: zonesData, isLoading } = useQuery('zones', () => zoneService.getAll(), {
-    retry: false,
-    onError: () => {},
-  })
-  const data = useDemoData(zonesData, demoZones)
-=======
+  // For managers, filter by manager_id; for admins, show all zones
+  const managerId = user?.user_type === 'manager' ? user?.userId : undefined
   const { data, isLoading } = useQuery(
-    ['zones', statusFilter, searchTerm],
-    () => zoneService.getAll({ status: statusFilter !== 'all' ? statusFilter : undefined, search: searchTerm || undefined })
+    ['zones', statusFilter, searchTerm, managerId],
+    () => zoneService.getAll({ 
+      status: statusFilter !== 'all' ? statusFilter : undefined, 
+      search: searchTerm || undefined,
+      manager_id: managerId,
+    }),
+    {
+      retry: false,
+      onError: () => {},
+    }
   )
+  
+  const allZones = data?.data || []
+  // For managers, also filter by assigned_zones if available
+  const zones = user?.user_type === 'manager' && user?.profile?.assigned_zones
+    ? allZones.filter((z: Zone) => user.profile.assigned_zones.includes(z.zone_id!))
+    : allZones
   
   const { data: zoneStats } = useQuery(
     ['zone-stats', selectedZone?.zone_id],
     () => zoneService.getStatistics(selectedZone?.zone_id!),
-    { enabled: !!selectedZone?.zone_id && showDetails }
+    { enabled: !!selectedZone?.zone_id && showDetails, retry: false, onError: () => {} }
   )
   
   const { data: zoneSpaces } = useQuery(
     ['zone-spaces', selectedZone?.zone_id],
     () => zoneService.getSpaces(selectedZone?.zone_id!),
-    { enabled: !!selectedZone?.zone_id && showDetails }
+    { enabled: !!selectedZone?.zone_id && showDetails, retry: false, onError: () => {} }
   )
->>>>>>> 79f519dd79e06348c0ab26c810f91bf9e848dd1c
+  
+  // Also get zone details which includes stats and spaces
+  const { data: zoneDetails } = useQuery(
+    ['zone-details', selectedZone?.zone_id],
+    () => zoneService.getById(selectedZone?.zone_id!),
+    { enabled: !!selectedZone?.zone_id && showDetails, retry: false, onError: () => {} }
+  )
+  
+  // Use zoneDetails if available, otherwise use separate queries
+  const zoneStatistics = zoneDetails?.data?.stats || zoneStats?.data
+  const spacesInZone = zoneDetails?.data?.spaces || zoneSpaces?.data || []
 
   const createMutation = useMutation((zone: Zone) => zoneService.create(zone), {
     onSuccess: () => {
@@ -94,6 +112,8 @@ const Zones = () => {
       zone_code: '',
       description: '',
       location: '',
+      manager_id: undefined,
+      total_spaces: 0,
       status: 'active',
     })
   }
@@ -176,7 +196,7 @@ const Zones = () => {
               </tr>
             </thead>
             <tbody>
-              {data?.data?.map((zone: Zone) => (
+              {zones?.map((zone: Zone) => (
                 <tr key={zone.zone_id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="py-3 px-4">{zone.zone_code}</td>
                   <td className="py-3 px-4 font-medium">{zone.zone_name}</td>
@@ -343,46 +363,46 @@ const Zones = () => {
                 <p className="text-gray-900">{selectedZone.description || 'N/A'}</p>
               </div>
             </div>
-            {zoneStats?.data && (
+            {zoneStatistics && (
               <div className="border-t pt-4 mb-4">
                 <h3 className="text-lg font-semibold mb-3">Statistics</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <label className="text-sm font-medium text-gray-600">Total Spaces</label>
-                    <p className="text-2xl font-bold text-gray-900">{zoneStats.data.total_spaces || 0}</p>
+                    <p className="text-2xl font-bold text-gray-900">{zoneStatistics.total_spaces || 0}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">Occupied</label>
-                    <p className="text-2xl font-bold text-gray-900">{zoneStats.data.occupied_spaces || 0}</p>
+                    <p className="text-2xl font-bold text-gray-900">{zoneStatistics.occupied_spaces || 0}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">Total Allocations</label>
-                    <p className="text-2xl font-bold text-gray-900">{zoneStats.data.total_allocations || 0}</p>
+                    <p className="text-2xl font-bold text-gray-900">{zoneStatistics.total_allocations || 0}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">Total Revenue</label>
-                    <p className="text-2xl font-bold text-gray-900">${zoneStats.data.total_revenue || 0}</p>
+                    <p className="text-2xl font-bold text-gray-900">${(zoneStatistics.total_revenue || 0).toFixed(2)}</p>
                   </div>
                 </div>
               </div>
             )}
-            {zoneSpaces?.data && (
+            {spacesInZone && spacesInZone.length > 0 && (
               <div className="border-t pt-4">
                 <h3 className="text-lg font-semibold mb-3">Spaces in Zone</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b">
-                        <th className="text-left py-2">Space Code</th>
+                        <th className="text-left py-2">Space Number</th>
                         <th className="text-left py-2">Type</th>
                         <th className="text-left py-2">Status</th>
                         <th className="text-left py-2">Monthly Rate</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {zoneSpaces.data.map((space: any) => (
+                      {spacesInZone.map((space: any) => (
                         <tr key={space.space_id} className="border-b">
-                          <td className="py-2">{space.space_code || space.space_number}</td>
+                          <td className="py-2">{space.space_number || space.space_code}</td>
                           <td className="py-2 capitalize">{space.space_type}</td>
                           <td className="py-2">
                             <span className={`px-2 py-1 rounded text-xs ${
@@ -393,7 +413,7 @@ const Zones = () => {
                               {space.status}
                             </span>
                           </td>
-                          <td className="py-2">${space.monthly_rate || 0}</td>
+                          <td className="py-2">${(space.monthly_rate || space.daily_rate || 0).toFixed(2)}</td>
                         </tr>
                       ))}
                     </tbody>

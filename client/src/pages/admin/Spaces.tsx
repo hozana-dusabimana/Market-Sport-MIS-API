@@ -2,15 +2,12 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { spaceService, Space } from '../../services/spaceService'
 import { zoneService } from '../../services/zoneService'
+import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
-<<<<<<< HEAD
-import { Plus, Edit, Trash2, Square } from 'lucide-react'
-import { demoSpaces, demoZones, useDemoData } from '../../utils/demoData'
-=======
 import { Plus, Edit, Trash2, Square, Search, Eye, Filter } from 'lucide-react'
->>>>>>> 79f519dd79e06348c0ab26c810f91bf9e848dd1c
 
 const Spaces = () => {
+  const { user } = useAuthStore()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingSpace, setEditingSpace] = useState<Space | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -28,42 +25,60 @@ const Spaces = () => {
   })
 
   const queryClient = useQueryClient()
-<<<<<<< HEAD
-  const { data: spacesData, isLoading } = useQuery('spaces', () => spaceService.getAll(), {
-    retry: false,
-    onError: () => {},
-  })
-  const { data: zonesData } = useQuery('zones', () => zoneService.getAll(), {
-    retry: false,
-    onError: () => {},
-  })
-  const spaces = useDemoData(spacesData, demoSpaces)
-  const zones = useDemoData(zonesData, demoZones)
-=======
-  const { data: spaces, isLoading } = useQuery(
-    ['spaces', statusFilter, zoneFilter, typeFilter, searchTerm],
+  // For managers, get their assigned zones first
+  const managerId = user?.user_type === 'manager' ? user?.userId : undefined
+  const managedZoneIds = user?.user_type === 'manager' && user?.profile?.assigned_zones
+    ? user.profile.assigned_zones
+    : []
+
+  const { data: zonesData } = useQuery(
+    ['zones', managerId],
+    () => zoneService.getAll({ manager_id: managerId }),
+    {
+      retry: false,
+      onError: () => {},
+    }
+  )
+  const allZones = zonesData?.data || []
+  const zones = managedZoneIds.length > 0
+    ? allZones.filter((z: any) => managedZoneIds.includes(z.zone_id))
+    : allZones
+
+  const { data: spacesData, isLoading } = useQuery(
+    ['spaces', statusFilter, zoneFilter, typeFilter, searchTerm, managedZoneIds],
     () =>
       spaceService.getAll({
         status: statusFilter !== 'all' ? statusFilter : undefined,
         zone_id: zoneFilter !== 'all' ? parseInt(zoneFilter) : undefined,
         space_type: typeFilter !== 'all' ? typeFilter : undefined,
         search: searchTerm || undefined,
-      })
-  )
-  const { data: zones } = useQuery('zones', () => zoneService.getAll())
-  
-  const { data: currentAllocation } = useQuery(
-    ['space-allocation', selectedSpace?.space_id],
-    () => spaceService.getCurrentAllocation(selectedSpace?.space_id!),
-    { enabled: !!selectedSpace?.space_id && showDetails }
+      }),
+    {
+      retry: false,
+      onError: () => {},
+    }
   )
   
-  const { data: allocationHistory } = useQuery(
+  const allSpaces = spacesData?.data || []
+  // For managers, filter spaces by their assigned zones
+  const spaces = managedZoneIds.length > 0
+    ? allSpaces.filter((s: Space) => managedZoneIds.includes(s.zone_id))
+    : allSpaces
+  
+  const { data: spaceDetails } = useQuery(
+    ['space-details', selectedSpace?.space_id],
+    () => spaceService.getById(selectedSpace?.space_id!),
+    { enabled: !!selectedSpace?.space_id && showDetails, retry: false, onError: () => {} }
+  )
+  
+  const { data: allocationHistoryData } = useQuery(
     ['space-allocation-history', selectedSpace?.space_id],
     () => spaceService.getAllocationHistory(selectedSpace?.space_id!),
-    { enabled: !!selectedSpace?.space_id && showDetails }
+    { enabled: !!selectedSpace?.space_id && showDetails, retry: false, onError: () => {} }
   )
->>>>>>> 79f519dd79e06348c0ab26c810f91bf9e848dd1c
+  
+  const currentAllocation = spaceDetails?.data?.currentAllocation || null
+  const allocationHistory = allocationHistoryData?.data || []
 
   const createMutation = useMutation((space: Space) => spaceService.create(space), {
     onSuccess: () => {
@@ -181,14 +196,14 @@ const Spaces = () => {
               </tr>
             </thead>
             <tbody>
-              {spaces?.data?.map((space: Space) => {
-                const zone = zones?.data?.find((z: any) => z.zone_id === space.zone_id)
+              {spaces?.map((space: Space) => {
+                const zone = zones.find((z: any) => z.zone_id === space.zone_id)
                 return (
                   <tr key={space.space_id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-4 font-medium">{space.space_code}</td>
+                    <td className="py-3 px-4 font-medium">{space.space_number || space.space_code}</td>
                     <td className="py-3 px-4">{zone?.zone_name || 'N/A'}</td>
                     <td className="py-3 px-4 capitalize">{space.space_type}</td>
-                    <td className="py-3 px-4">${space.monthly_rate}</td>
+                    <td className="py-3 px-4">${space.monthly_rate || space.daily_rate || 0}</td>
                     <td className="py-3 px-4">
                       <select
                         value={space.status}
@@ -266,7 +281,7 @@ const Spaces = () => {
                   required
                 >
                   <option value={0}>Select Zone</option>
-                  {zones?.data?.map((zone: any) => (
+                  {zones.map((zone: any) => (
                     <option key={zone.zone_id} value={zone.zone_id}>
                       {zone.zone_name}
                     </option>
@@ -274,13 +289,45 @@ const Spaces = () => {
                 </select>
               </div>
               <div>
-                <label className="label">Space Code *</label>
+                <label className="label">Space Number/Code *</label>
                 <input
                   type="text"
-                  value={formData.space_code}
-                  onChange={(e) => setFormData({ ...formData, space_code: e.target.value })}
+                  value={formData.space_number || formData.space_code || ''}
+                  onChange={(e) => setFormData({ ...formData, space_number: e.target.value, space_code: e.target.value })}
                   className="input"
                   required
+                />
+              </div>
+              <div>
+                <label className="label">Size (sqm)</label>
+                <input
+                  type="number"
+                  value={formData.size_sqm || ''}
+                  onChange={(e) => setFormData({ ...formData, size_sqm: parseInt(e.target.value) })}
+                  className="input"
+                  placeholder="Square meters"
+                />
+              </div>
+              <div>
+                <label className="label">Daily Rate ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.daily_rate || ''}
+                  onChange={(e) => setFormData({ ...formData, daily_rate: parseFloat(e.target.value) })}
+                  className="input"
+                  placeholder="Daily rate"
+                />
+              </div>
+              <div>
+                <label className="label">Weekly Rate ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.weekly_rate || ''}
+                  onChange={(e) => setFormData({ ...formData, weekly_rate: parseFloat(e.target.value) })}
+                  className="input"
+                  placeholder="Weekly rate"
                 />
               </div>
               <div>
@@ -297,14 +344,24 @@ const Spaces = () => {
                 </select>
               </div>
               <div>
-                <label className="label">Monthly Rate ($) *</label>
+                <label className="label">Monthly Rate ($)</label>
                 <input
                   type="number"
                   step="0.01"
-                  value={formData.monthly_rate}
+                  value={formData.monthly_rate || ''}
                   onChange={(e) => setFormData({ ...formData, monthly_rate: parseFloat(e.target.value) })}
                   className="input"
-                  required
+                  placeholder="Monthly rate"
+                />
+              </div>
+              <div>
+                <label className="label">Features</label>
+                <textarea
+                  value={formData.features || ''}
+                  onChange={(e) => setFormData({ ...formData, features: e.target.value })}
+                  className="input"
+                  rows={2}
+                  placeholder="Space features (e.g., electricity, water, etc.)"
                 />
               </div>
               <div>

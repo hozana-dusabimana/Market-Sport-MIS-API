@@ -1,29 +1,41 @@
 import { useQuery } from 'react-query'
 import { useAuthStore } from '../../store/authStore'
 import { paymentService } from '../../services/paymentService'
+import { sellerService } from '../../services/sellerService'
 import { Download, CreditCard, Calendar } from 'lucide-react'
 import { format } from 'date-fns'
-import { demoPayments, useDemoData } from '../../utils/demoData'
 
 const SellerPayments = () => {
   const { user } = useAuthStore()
 
-  const { data: paymentsData, isLoading } = useQuery(
-    'seller-payments',
-    () => paymentService.getSellerPayments(user?.userId || 0),
-    { enabled: !!user?.userId, retry: false, onError: () => {} }
+  // First get seller profile to get seller_id
+  const userId = user?.userId
+  const { data: sellerProfileResponse, isLoading: profileLoading } = useQuery(
+    ['seller-profile', userId],
+    () => sellerService.getAll({ id: userId }),
+    { enabled: !!userId && user?.user_type === 'seller', retry: false, onError: () => {} }
   )
-  const payments = useDemoData(paymentsData, demoPayments.filter((p: any) => p.seller_id === 1))
 
-  if (isLoading) {
+  // Extract seller_id from response
+  const sellerProfile = sellerProfileResponse?.data?.sellers?.[0] || sellerProfileResponse?.data
+  const sellerId = sellerProfile?.seller_id || sellerProfile?.user_id || userId
+
+  const { data: paymentsData, isLoading: paymentsLoading } = useQuery(
+    ['seller-payments', sellerId],
+    () => paymentService.getAll({ seller_id: sellerId }),
+    { enabled: !!sellerId, retry: false, onError: () => {} }
+  )
+  const payments = paymentsData?.data || []
+
+  if (profileLoading || paymentsLoading) {
     return <div className="text-center py-12">Loading payments...</div>
   }
 
-  const totalPaid = payments?.data?.reduce((sum: number, p: any) => {
+  const totalPaid = payments.reduce((sum: number, p: any) => {
     return sum + (p.status === 'completed' ? p.amount : 0)
   }, 0) || 0
 
-  const pendingAmount = payments?.data?.reduce((sum: number, p: any) => {
+  const pendingAmount = payments.reduce((sum: number, p: any) => {
     return sum + (p.status === 'pending' ? p.amount : 0)
   }, 0) || 0
 
@@ -72,8 +84,8 @@ const SellerPayments = () => {
               </tr>
             </thead>
             <tbody>
-              {payments?.data?.length > 0 ? (
-                payments.data.map((payment: any) => (
+              {payments?.length > 0 ? (
+                payments.map((payment: any) => (
                   <tr key={payment.payment_id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-3 px-4">#{payment.payment_id}</td>
                     <td className="py-3 px-4 font-medium">${payment.amount}</td>
