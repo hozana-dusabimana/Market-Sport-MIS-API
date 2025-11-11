@@ -63,7 +63,7 @@ class Allocation {
         sa.*,
         s.full_name as seller_name,
         s.business_name,
-        s.phone_number as seller_phone,
+        u.phone_number as seller_phone,
         u.email as seller_email,
         sp.space_number,
         sp.space_type,

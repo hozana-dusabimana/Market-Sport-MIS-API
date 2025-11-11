@@ -68,9 +68,12 @@ class AllocationController {
         return res.status(400).json({ success: false, message: 'Seller ID and Space ID are required' });
       }
 
-      if (!req.user || !req.user.user_id) {
+      if (!req.user || (!req.user.user_id && !req.user.userId)) {
         return res.status(401).json({ success: false, message: 'User authentication required' });
       }
+
+      // Get user_id from either user_id or userId (both formats supported)
+      const approvedBy = req.user.user_id || req.user.userId;
 
       // Check for existing active allocation for this seller-space combination
       const existingAllocation = await Allocation.findActive(seller_id, space_id);
@@ -90,7 +93,7 @@ class AllocationController {
         start_date,
         end_date,
         allocation_type,
-        approved_by: req.user.user_id,
+        approved_by: approvedBy,
         notes: notes || null,
         status: 'active'
       });
