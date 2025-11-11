@@ -1,5 +1,4 @@
-module.exports = {
-  async up(connection) {
+export async function up(connection) {
     await connection.query(`
       CREATE TABLE space_allocations (
         allocation_id INT PRIMARY KEY AUTO_INCREMENT,
@@ -20,9 +19,8 @@ module.exports = {
         INDEX idx_dates (start_date, end_date)
       )
     `);
-  },
+}
 
-  async down(connection) {
-    await connection.query('DROP TABLE IF EXISTS space_allocations');
-  }
-};
+export async function down(connection) {
+  await connection.query('DROP TABLE IF EXISTS space_allocations');
+}

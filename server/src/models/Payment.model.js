@@ -1,7 +1,7 @@
 // ============================================
 // src/models/Allocation.model.js
 // ============================================
-const db = require('../config/database');
+import db from '../config/database.js';
 
 class Allocation {
   static async findAll(filters = {}) {
@@ -79,6 +79,21 @@ class Allocation {
       JOIN zones z ON sp.zone_id = z.zone_id
       WHERE sa.allocation_id = ?
     `, [allocationId]);
+    return rows[0];
+  }
+
+  static async findActive(sellerId, spaceId) {
+    const [rows] = await db.query(`
+      SELECT 
+        sa.*,
+        s.full_name as seller_name,
+        sp.space_number
+      FROM space_allocations sa
+      JOIN sellers s ON sa.seller_id = s.seller_id
+      JOIN spaces sp ON sa.space_id = sp.space_id
+      WHERE sa.seller_id = ? AND sa.space_id = ? AND sa.status = 'active'
+      LIMIT 1
+    `, [sellerId, spaceId]);
     return rows[0];
   }
 
@@ -497,4 +512,4 @@ class Payment {
   }
 }
 
-module.exports = { Allocation, Payment };
+export { Allocation, Payment };

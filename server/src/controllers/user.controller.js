@@ -1,7 +1,7 @@
-const db = require('../config/database');
-const User = require('../models/User.model');
-const bcrypt = require('bcryptjs');
-const config = require('../config/config'); // Adjust if config structure differs
+import db from '../config/database.js';
+import User from '../models/User.model.js';
+import bcrypt from 'bcryptjs';
+import config from '../config/config.js'; // Adjust if config structure differs
 
 class UserController {
   // Get all users with filters (for admins/managers)
@@ -437,4 +437,4 @@ async updateUser(req, res) {
   }
 }
 
-module.exports = new UserController();
+export default new UserController();

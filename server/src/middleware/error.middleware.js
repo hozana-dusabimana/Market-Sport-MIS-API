@@ -120,8 +120,5 @@ class AppError extends Error {
   }
 }
 
-// Export as default and named exports
-module.exports = errorMiddleware;
-module.exports.notFoundMiddleware = notFoundMiddleware;
-module.exports.asyncHandler = asyncHandler;
-module.exports.AppError = AppError;
+export default errorMiddleware;
+export { notFoundMiddleware, asyncHandler, AppError };

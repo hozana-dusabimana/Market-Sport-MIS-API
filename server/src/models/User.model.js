@@ -1,4 +1,4 @@
-const db = require('../config/database');
+import db from '../config/database.js';
 
 class User {
   static async findByUsername(username, connection = db) {
@@ -192,4 +192,4 @@ class User {
   }
 }
 
-module.exports = User;
+export default User;

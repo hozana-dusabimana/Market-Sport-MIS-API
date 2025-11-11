@@ -1,5 +1,4 @@
-module.exports = {
-  async up(connection) {
+export async function up(connection) {
     // Zones table
     await connection.query(`
       CREATE TABLE zones (
@@ -37,10 +36,9 @@ module.exports = {
         INDEX idx_space_type (space_type)
       )
     `);
-  },
+}
 
-  async down(connection) {
-    await connection.query('DROP TABLE IF EXISTS spaces');
-    await connection.query('DROP TABLE IF EXISTS zones');
-  }
-};
+export async function down(connection) {
+  await connection.query('DROP TABLE IF EXISTS spaces');
+  await connection.query('DROP TABLE IF EXISTS zones');
+}
