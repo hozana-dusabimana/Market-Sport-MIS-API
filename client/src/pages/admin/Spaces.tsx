@@ -154,6 +154,22 @@ const Spaces = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    // For managers, validate that the zone belongs to their managed zones
+    if (user?.user_type === 'manager' && managedZoneIds.length > 0) {
+      const selectedZoneId = formData.zone_id
+      if (selectedZoneId && !managedZoneIds.includes(selectedZoneId)) {
+        toast.error('You can only create/edit spaces in your managed zones')
+        return
+      }
+      // When editing, ensure manager can only edit spaces in their managed zones
+      if (editingSpace) {
+        const spaceZone = editingSpace.zone_id
+        if (spaceZone && !managedZoneIds.includes(spaceZone)) {
+          toast.error('You can only edit spaces in your managed zones')
+          return
+        }
+      }
+    }
     if (editingSpace) {
       updateMutation.mutate({ id: editingSpace.space_id!, space: formData })
     } else {
@@ -237,24 +253,38 @@ const Spaces = () => {
                         >
                           <Eye size={18} />
                         </button>
-                        <button
-                          onClick={() => handleEdit(space)}
-                          className="text-primary-600 hover:text-primary-700"
-                          title="Edit"
-                        >
-                          <Edit size={18} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (confirm('Are you sure you want to delete this space?')) {
-                              deleteMutation.mutate(space.space_id!)
-                            }
-                          }}
-                          className="text-red-600 hover:text-red-700"
-                          title="Delete"
-                        >
-                          <Trash2 size={18} />
-                        </button>
+                        {(user?.user_type !== 'manager' || managedZoneIds.includes(space.zone_id)) && (
+                          <>
+                            <button
+                              onClick={() => {
+                                if (user?.user_type === 'manager' && !managedZoneIds.includes(space.zone_id)) {
+                                  toast.error('You can only edit spaces in your managed zones')
+                                  return
+                                }
+                                handleEdit(space)
+                              }}
+                              className="text-blue-600 hover:text-blue-700"
+                              title="Edit"
+                            >
+                              <Edit size={18} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (user?.user_type === 'manager' && !managedZoneIds.includes(space.zone_id)) {
+                                  toast.error('You can only delete spaces in your managed zones')
+                                  return
+                                }
+                                if (confirm('Are you sure you want to delete this space?')) {
+                                  deleteMutation.mutate(space.space_id!)
+                                }
+                              }}
+                              className="text-red-600 hover:text-red-700"
+                              title="Delete"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -15,6 +15,9 @@ const Profile = () => {
       phone_number: user?.phone_number || '',
       full_name: user?.profile?.full_name || '',
       business_name: user?.profile?.business_name || '',
+      business_type: user?.profile?.business_type || '',
+      tin_number: user?.profile?.tin_number || '',
+      emergency_contact: user?.profile?.emergency_contact || '',
       address: user?.profile?.address || '',
     },
   })
@@ -146,6 +149,37 @@ const Profile = () => {
                       type="text"
                       {...registerProfile('business_name')}
                       className="input"
+                      placeholder="Enter business name"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="label">Business Type</label>
+                    <input
+                      type="text"
+                      {...registerProfile('business_type')}
+                      className="input"
+                      placeholder="e.g., Retail, Food, etc."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="label">TIN Number</label>
+                    <input
+                      type="text"
+                      {...registerProfile('tin_number')}
+                      className="input"
+                      placeholder="Enter TIN number"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="label">Emergency Contact</label>
+                    <input
+                      type="tel"
+                      {...registerProfile('emergency_contact')}
+                      className="input"
+                      placeholder="Enter emergency contact"
                     />
                   </div>
 
@@ -155,6 +189,7 @@ const Profile = () => {
                       {...registerProfile('address')}
                       className="input"
                       rows={3}
+                      placeholder="Enter address"
                     />
                   </div>
                 </>

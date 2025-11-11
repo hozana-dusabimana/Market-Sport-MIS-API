@@ -107,7 +107,17 @@ const Payments = () => {
   const allocations = managedZoneIds.length > 0 ? managedAllocationsForPayments : allAllocationsForPayments
   const totalRevenue = revenueData?.data?.total_revenue || 0
 
-  const createMutation = useMutation((payment: Payment) => paymentService.create(payment), {
+  const createMutation = useMutation((payment: Payment) => {
+    // For managers, validate that the allocation belongs to their managed zones
+    if (user?.user_type === 'manager' && managedZoneIds.length > 0) {
+      const paymentAllocation = allocations.find((a: any) => a.allocation_id === payment.allocation_id)
+      if (paymentAllocation && !managedAllocationIdsForPayments.includes(payment.allocation_id)) {
+        toast.error('You can only create payments for allocations in your managed zones')
+        throw new Error('Unauthorized payment')
+      }
+    }
+    return paymentService.create(payment)
+  }, {
     onSuccess: () => {
       queryClient.invalidateQueries('payments')
       toast.success('Payment recorded successfully')
@@ -115,7 +125,9 @@ const Payments = () => {
       resetForm()
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to record payment')
+      if (error.message !== 'Unauthorized payment') {
+        toast.error(error.response?.data?.message || 'Failed to record payment')
+      }
     },
   })
 
