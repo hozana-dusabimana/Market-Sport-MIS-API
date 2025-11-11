@@ -7,7 +7,7 @@ export async function up(connection) {
         allocation_date DATE NOT NULL,
         start_date DATE NOT NULL,
         end_date DATE,
-        allocation_type ENUM('daily', 'weekly', 'monthly', 'permanent') NOT NULL,
+        allocation_type ENUM('daily', 'weekly', 'monthly', 'permanent', 'temporary') NOT NULL,
         status ENUM('active', 'expired', 'cancelled') DEFAULT 'active',
         approved_by INT,
         notes TEXT,
