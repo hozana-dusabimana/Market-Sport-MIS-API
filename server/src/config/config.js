@@ -1,6 +1,6 @@
 import 'dotenv/config';
 
-const config = {
+const config  = {
   env: process.env.NODE_ENV || 'development',
   port: process.env.PORT || 3000,
   
@@ -21,5 +21,4 @@ const config = {
     rounds: parseInt(process.env.BCRYPT_ROUNDS) || 10
   }
 };
-
-export default config;
+export default config
