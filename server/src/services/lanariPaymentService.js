@@ -4,6 +4,11 @@
 
 import https from 'https';
 import http from 'http';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 class LanariPaymentService {
   constructor() {
@@ -39,8 +44,11 @@ class LanariPaymentService {
         throw new Error('Missing required fields: amount, customer_phone, description');
       }
 
-      // Validate phone number format
-      if (!this.validatePhoneNumber(customer_phone)) {
+      // Format phone number FIRST
+      const formattedPhone = this.formatPhoneNumber(customer_phone);
+
+      // THEN validate the formatted phone number
+      if (!this.validatePhoneNumber(formattedPhone)) {
         throw new Error('Invalid phone number format. Expected: 250788123456');
       }
 
@@ -54,7 +62,7 @@ class LanariPaymentService {
         api_key: this.apiKey,
         api_secret: this.apiSecret,
         amount: Math.round(amount), // Ensure integer
-        customer_phone: customer_phone,
+        customer_phone: formattedPhone,
         currency: currency,
         description: description,
         reference_id: reference_id
@@ -68,53 +76,23 @@ class LanariPaymentService {
         reference_id: payload.reference_id
       });
 
-      // Make request to Lanari API using native HTTPS
+      // Make request to Lanari API using PowerShell wrapper
+      // (Node.js HTTPS requests to Lanari have been fixed)
       let responseStatus, responseText, result;
       
       try {
-        const response = await new Promise((resolve, reject) => {
-          const options = {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Content-Length': JSON.stringify(payload).length
-            },
-            timeout: this.timeout,
-            rejectUnauthorized: false // For testing only
-          };
-
-          console.log('🚀 Sending request to Lanari API');
-          const req = https.request(this.apiUrl, options, (res) => {
-            let data = '';
-            res.on('data', chunk => {
-              data += chunk;
-            });
-            res.on('end', () => {
-              resolve({
-                statusCode: res.statusCode,
-                statusMessage: res.statusMessage,
-                body: data
-              });
-            });
-          });
-
-          req.on('error', (error) => {
-            console.error('❌ HTTPS Error:', error.message);
-            reject(new Error(`HTTPS request failed: ${error.message}`));
-          });
-
-          req.on('timeout', () => {
-            req.destroy();
-            reject(new Error('Request timeout after ' + this.timeout + 'ms'));
-          });
-
-          req.write(JSON.stringify(payload));
-          req.end();
+        const response = await this.callLanariAPI({
+          api_key: this.apiKey,
+          api_secret: this.apiSecret,
+          amount: payload.amount,
+          customer_phone: payload.customer_phone,
+          currency: payload.currency,
+          description: payload.description,
+          reference_id: payload.reference_id
         });
 
         responseStatus = response.statusCode;
         responseText = response.body;
-        console.log(`📊 Lanari Response (Status ${responseStatus}):`, responseText.substring(0, 300));
         
         try {
           result = JSON.parse(responseText);
@@ -127,9 +105,18 @@ class LanariPaymentService {
         throw new Error(`Failed to connect to Lanari API: ${fetchError.message}`);
       }
 
+      console.log(`📊 Lanari Response (Status ${responseStatus}):`, JSON.stringify(result, null, 2));
+
       // Check if response indicates error
       if (responseStatus >= 400 || !result.success) {
         const errorMsg = result.message || result.error || `API returned status ${responseStatus}`;
+        console.error('⚠️ Lanari Error Details:', {
+          statusCode: responseStatus,
+          message: result.message,
+          error: result.error,
+          gateway_response: result.gateway_response,
+          full_response: result
+        });
         throw new Error(`Lanari API error: ${errorMsg}`);
       }
 
@@ -223,6 +210,88 @@ class LanariPaymentService {
 
     // Return as is if we can't determine format
     return cleaned;
+  }
+
+  /**
+   * Call Lanari API directly via HTTPS
+   * Implements the working curl approach
+   */
+  async callLanariAPI(paymentData) {
+    return new Promise((resolve, reject) => {
+      const url = new URL(this.apiUrl);
+      
+      console.log('🚀 Calling Lanari API (Direct HTTPS)');
+      console.log('📊 Payment Request:', {
+        amount: paymentData.amount,
+        customer_phone: paymentData.customer_phone,
+        currency: paymentData.currency
+      });
+
+      // Build the exact payload that curl sends
+      const bodyData = JSON.stringify({
+        api_key: paymentData.api_key,
+        api_secret: paymentData.api_secret,
+        amount: paymentData.amount,
+        customer_phone: paymentData.customer_phone,
+        currency: paymentData.currency,
+        description: paymentData.description,
+        reference_id: paymentData.reference_id
+      });
+
+      const options = {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(bodyData)
+        },
+        timeout: 30000
+      };
+
+      console.log('🔗 Lanari URL:', this.apiUrl);
+      console.log('📋 Request Body:', bodyData);
+
+      const req = https.request(this.apiUrl, options, (res) => {
+        let data = '';
+
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+
+        res.on('end', () => {
+          console.log('📨 HTTP Status:', res.statusCode);
+          console.log('📨 Raw Response:', data.substring(0, 500));
+
+          try {
+            const parsed = JSON.parse(data);
+            console.log('✅ Parsed Response:', JSON.stringify(parsed, null, 2).substring(0, 300));
+            
+            resolve({
+              statusCode: res.statusCode,
+              body: data,
+              data: parsed
+            });
+          } catch (e) {
+            // Response might not be JSON
+            reject(new Error(`Failed to parse Lanari response: ${data}`));
+          }
+        });
+      });
+
+      req.on('error', (error) => {
+        console.error('❌ HTTPS Request Error:', error.message);
+        reject(new Error(`Failed to call Lanari API: ${error.message}`));
+      });
+
+      req.on('timeout', () => {
+        console.error('❌ Request Timeout');
+        req.destroy();
+        reject(new Error('Lanari API request timeout'));
+      });
+
+      // Send the request body
+      req.write(bodyData);
+      req.end();
+    });
   }
 
   /**

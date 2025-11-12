@@ -50,13 +50,11 @@ class NotificationController {
   // Get user notifications
   async getUserNotifications(req, res) {
     try {
-      const userId = req.user?.user_id || req.query.user_id;
-      
+      const userId = req.user?.userId || req.query.user_id;
+
       if (!userId) {
         return res.status(400).json({ success: false, message: 'User ID is required' });
-      }
-
-      const filters = {
+      }      const filters = {
         status: req.query.status,
         notification_type: req.query.notification_type,
         limit: req.query.limit ? parseInt(req.query.limit) : 50,
@@ -230,7 +228,7 @@ class NotificationController {
   // Get unread count
   async getUnreadCount(req, res) {
     try {
-      const userId = req.user?.user_id || req.query.user_id;
+      const userId = req.user?.userId || req.query.user_id;
 
       if (!userId) {
         return res.status(400).json({ success: false, message: 'User ID is required' });
