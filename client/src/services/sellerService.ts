@@ -46,79 +46,134 @@ export interface CreateSellerData {
 }
 
 export const sellerService = {
+  // Get all sellers with optional filters
   getAll: async (params?: {
+    id?: number
     verification_status?: string
     business_type?: string
     search?: string
     page?: number
     limit?: number
-    id?: number
+    manager_id?: number
   }) => {
-    const response = await api.get('/sellers', { params })
-    return response.data
+    try {
+      const response = await api.get('/sellers', { params })
+      return response.data
+    } catch (error) {
+      console.error('Error fetching sellers:', error)
+      throw error
+    }
   },
 
+  // Get seller by ID
   getById: async (id: number) => {
-    const response = await api.get(`/sellers/${id}`)
-    return response.data
+    try {
+      const response = await api.get(`/sellers/${id}`)
+      return response.data
+    } catch (error) {
+      console.error(`Error fetching seller with ID ${id}:`, error)
+      throw error
+    }
   },
 
+  // Get seller by user_id (corrected to filter locally if backend doesn't support query)
   getByUserId: async (userId: number) => {
-    // First get all sellers and find by user_id, or use search
-    const response = await api.get('/sellers', { params: { id: userId } })
-    return response.data
+    try {
+      const response = await api.get('/sellers')
+      const seller = response.data?.sellers?.find((s: Seller) => s.user_id === userId)
+      if (!seller) throw new Error('Seller not found')
+      return { data: seller }
+    } catch (error) {
+      console.error(`Error fetching seller for user ID ${userId}:`, error)
+      throw error
+    }
   },
 
+  // Create new seller
   create: async (data: CreateSellerData) => {
-    const response = await api.post('/sellers', data)
-    return response.data
+    try {
+      const response = await api.post('/sellers', data)
+      return response.data
+    } catch (error) {
+      console.error('Error creating seller:', error)
+      throw error
+    }
   },
 
+  // Update seller details
   update: async (id: number, data: Partial<Seller>) => {
-    const response = await api.put(`/sellers/${id}`, data)
-    return response.data
+    try {
+      const response = await api.put(`/sellers/${id}`, data)
+      return response.data
+    } catch (error) {
+      console.error(`Error updating seller with ID ${id}:`, error)
+      throw error
+    }
   },
 
+  // Update verification status
   updateVerificationStatus: async (id: number, status: 'pending' | 'verified' | 'rejected') => {
-    const response = await api.patch(`/sellers/verification/${id}`, { status })
-    return response.data
+    try {
+      const response = await api.patch(`/sellers/verification/${id}`, { status })
+      return response.data
+    } catch (error) {
+      console.error(`Error updating verification for seller ID ${id}:`, error)
+      throw error
+    }
   },
 
+  // Delete seller
   delete: async (id: number) => {
-    const response = await api.delete(`/sellers/${id}`)
-    return response.data
+    try {
+      const response = await api.delete(`/sellers/${id}`)
+      return response.data
+    } catch (error) {
+      console.error(`Error deleting seller with ID ${id}:`, error)
+      throw error
+    }
   },
 
+  // Get seller allocations
   getAllocations: async (id: number) => {
-    const response = await api.get(`/sellers/${id}/allocations`)
-    return response.data
+    try {
+      const response = await api.get(`/sellers/${id}/allocations`)
+      return response.data
+    } catch (error) {
+      console.error(`Error fetching allocations for seller ID ${id}:`, error)
+      throw error
+    }
   },
 
+  // Get seller payments
   getPayments: async (id: number, params?: { start_date?: string; end_date?: string }) => {
-    const response = await api.get(`/sellers/${id}/payments`, { params })
-    return response.data
+    try {
+      const response = await api.get(`/sellers/${id}/payments`, { params })
+      return response.data
+    } catch (error) {
+      console.error(`Error fetching payments for seller ID ${id}:`, error)
+      throw error
+    }
   },
 
+  // Get seller statistics
   getStatistics: async (id: number) => {
-    const response = await api.get(`/sellers/${id}/stats`)
-    return response.data
+    try {
+      const response = await api.get(`/sellers/${id}/stats`)
+      return response.data
+    } catch (error) {
+      console.error(`Error fetching statistics for seller ID ${id}:`, error)
+      throw error
+    }
   },
 
+  // Get count by status
   getCountByStatus: async () => {
-    const response = await api.get('/sellers/counts')
-    return response.data
-  },
-
-  // Legacy methods for compatibility
-  getOne: async (id: number) => {
-    return await sellerService.getById(id)
-  },
-
-  updateStatus: async (id: number, status: Seller['status']) => {
-    return await sellerService.update(id, { status })
-  },
-
-  updateProfile: async (id: number, data: Partial<Seller>) => {
-    return await sellerService.update(id, data)
+    try {
+      const response = await api.get('/sellers/counts')
+      return response.data
+    } catch (error) {
+      console.error('Error fetching seller counts:', error)
+      throw error
+    }
   },
 }

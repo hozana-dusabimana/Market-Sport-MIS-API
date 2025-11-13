@@ -10,49 +10,82 @@ export interface Report {
 }
 
 export const reportService = {
-  getOccupancyReport: async (startDate: string, endDate: string) => {
-    const response = await api.get('/reports/occupancy', {
-      params: { start_date: startDate, end_date: endDate },
-    })
-    return response.data
+  async getOccupancyReport(startDate: string, endDate: string): Promise<Report[]> {
+    try {
+      const { data } = await api.get('/reports/occupancy', {
+        params: { start_date: startDate, end_date: endDate },
+      })
+      return data
+    } catch (error) {
+      console.error('Error fetching occupancy report:', error)
+      throw error
+    }
   },
 
-  getPaymentReport: async (startDate: string, endDate: string) => {
-    const response = await api.get('/reports/payments', {
-      params: { start_date: startDate, end_date: endDate },
-    })
-    return response.data
+  async getPaymentReport(startDate: string, endDate: string): Promise<Report[]> {
+    try {
+      const { data } = await api.get('/reports/payments', {
+        params: { start_date: startDate, end_date: endDate },
+      })
+      return data
+    } catch (error) {
+      console.error('Error fetching payment report:', error)
+      throw error
+    }
   },
 
-  getPerformanceReport: async (startDate: string, endDate: string) => {
-    const response = await api.get('/reports/performance', {
-      params: { start_date: startDate, end_date: endDate },
-    })
-    return response.data
+  async getPerformanceReport(startDate: string, endDate: string): Promise<Report[]> {
+    try {
+      const { data } = await api.get('/reports/performance', {
+        params: { start_date: startDate, end_date: endDate },
+      })
+      return data
+    } catch (error) {
+      console.error('Error fetching performance report:', error)
+      throw error
+    }
   },
 
-  getDailyReport: async (date: string) => {
-    const response = await api.get('/reports/daily', { params: { date } })
-    return response.data
+  async getDailyReport(date: string): Promise<Report> {
+    try {
+      const { data } = await api.get('/reports/daily', { params: { date } })
+      return data
+    } catch (error) {
+      console.error('Error fetching daily report:', error)
+      throw error
+    }
   },
 
-  getWeeklyReport: async (weekStart: string) => {
-    const response = await api.get('/reports/weekly', { params: { week_start: weekStart } })
-    return response.data
+  async getWeeklyReport(weekStart: string): Promise<Report> {
+    try {
+      const { data } = await api.get('/reports/weekly', { params: { week_start: weekStart } })
+      return data
+    } catch (error) {
+      console.error('Error fetching weekly report:', error)
+      throw error
+    }
   },
 
-  getMonthlyReport: async (month: string, year: string) => {
-    const response = await api.get('/reports/monthly', { params: { month, year } })
-    return response.data
+  async getMonthlyReport(month: string, year: string): Promise<Report> {
+    try {
+      const { data } = await api.get('/reports/monthly', { params: { month, year } })
+      return data
+    } catch (error) {
+      console.error('Error fetching monthly report:', error)
+      throw error
+    }
   },
 
-  exportReport: async (reportType: string, params: any) => {
-    const response = await api.get(`/reports/export/${reportType}`, {
-      params,
-      responseType: 'blob',
-    })
-    return response.data
+  async exportReport(reportType: string, params: Record<string, any>): Promise<Blob> {
+    try {
+      const { data } = await api.get(`/reports/export/${reportType}`, {
+        params,
+        responseType: 'blob',
+      })
+      return data
+    } catch (error) {
+      console.error('Error exporting report:', error)
+      throw error
+    }
   },
 }
-
-
