@@ -16,10 +16,10 @@ class AllocationController {
         offset: req.query.offset ? parseInt(req.query.offset) : 0
       };
 
-      // Auto-scope to manager's market when the requester is a manager
-      const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
+      // Auto-scope: managers see only allocations they created
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
       if (req.user?.user_type === 'manager' && managerId) {
-        filters.manager_id = managerId;
+        filters.created_by_manager_id = managerId;
       }
 
       const allocations = await Allocation.findAll(filters);
@@ -46,8 +46,8 @@ class AllocationController {
       }
 
       // Enforce ownership for managers (created-by-only)
-      const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
-      if (req.user?.user_type === 'manager' && managerId && allocation.manager_id !== managerId) {
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
+      if (req.user?.user_type === 'manager' && managerId && allocation.created_by_manager_id !== managerId) {
         return res.status(403).json({ success: false, message: 'Forbidden: allocation not owned by manager' });
       }
 
@@ -87,8 +87,8 @@ class AllocationController {
 
       // Get user_id from either user_id or userId (both formats supported)
       const approvedBy = req.user.user_id || req.user.userId;
-      // Determine manager_id (for manager users)
-      const managerId = req.user?.manager_id || req.user?.profile?.manager_id || null;
+      // Determine managerId (for manager users)
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id || null;
 
       // Check for existing active allocation for this seller-space combination
       const existingAllocation = await Allocation.findActive(seller_id, space_id);
@@ -102,7 +102,7 @@ class AllocationController {
 
       // For managers: ensure the space belongs to a zone owned by the manager
       if (req.user?.user_type === 'manager') {
-        const managerId = req.user?.manager_id || req.user?.profile?.manager_id || null;
+        const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id || null;
         if (!managerId) {
           return res.status(403).json({ success: false, message: 'Forbidden: manager id missing' });
         }
@@ -124,7 +124,8 @@ class AllocationController {
         end_date,
         allocation_type,
         approved_by: approvedBy,
-        manager_id: req.user?.user_type === 'manager' ? managerId : null,
+        manager_id: null,
+        created_by_manager_id: req.user?.user_type === 'manager' ? managerId : null,
         notes: notes || null,
         status: 'active'
       });
@@ -153,7 +154,7 @@ class AllocationController {
 
       // Enforce ownership for managers
       const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
-      if (req.user?.user_type === 'manager' && managerId && allocation.manager_id !== managerId) {
+      if (req.user?.user_type === 'manager' && managerId && allocation.created_by_manager_id !== managerId) {
         return res.status(403).json({ success: false, message: 'Forbidden: allocation not owned by manager' });
       }
 

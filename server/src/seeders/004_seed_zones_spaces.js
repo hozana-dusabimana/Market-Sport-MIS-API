@@ -12,8 +12,9 @@ export async function seed(connection) {
   for (const zone of zones) {
     await connection.query(
       `INSERT INTO zones (zone_name, zone_code, description, manager_id, total_spaces, status)
-       VALUES (?, ?, ?, ?, ?, 'active')`,
-      [zone.zone_name, zone.zone_code, zone.description, zone.manager_id, zone.total_spaces]
+       SELECT ?, ?, ?, ?, ?, 'active'
+       WHERE NOT EXISTS (SELECT 1 FROM zones WHERE zone_code = ?)`,
+      [zone.zone_name, zone.zone_code, zone.description, zone.manager_id, zone.total_spaces, zone.zone_code]
     );
   }
 
@@ -41,19 +42,25 @@ export async function seed(connection) {
       const sizeArr = [50, 75, 100, 150, 200];
       const size = sizeArr[Math.floor(Math.random() * sizeArr.length)];
       
+      const space_code = `SP-${String(spaceNumber).padStart(3, '0')}`;
       await connection.query(
         `INSERT INTO spaces 
          (zone_id, space_number, space_type, size_sqm, daily_rate, weekly_rate, monthly_rate, status, features)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'available', ?)`,
+         SELECT ?, ?, ?, ?, ?, ?, ?, 'available', ?
+         WHERE NOT EXISTS (
+           SELECT 1 FROM spaces WHERE zone_id = ? AND space_number = ?
+         )`,
         [
           zone.zone_id,
-          `SP-${String(spaceNumber).padStart(3, '0')}`,
+          space_code,
           spaceType,
           size,
           dailyRates[spaceType],
           weeklyRates[spaceType],
           monthlyRates[spaceType],
-          'Standard market space with good visibility'
+          'Standard market space with good visibility',
+          zone.zone_id,
+          space_code
         ]
       );
       

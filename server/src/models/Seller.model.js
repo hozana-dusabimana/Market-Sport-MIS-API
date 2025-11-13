@@ -36,7 +36,7 @@ class Seller {
       id_number,
       business_name,
       business_type,
-      manager_id,
+      created_by_manager_id,
       tin_number,
       emergency_contact,
       address,
@@ -47,7 +47,7 @@ class Seller {
     const [result] = await db.query(
       `INSERT INTO sellers (
         user_id, full_name, id_number, business_name, business_type,
-        manager_id, tin_number, emergency_contact, address, registration_date, verification_status
+        created_by_manager_id, tin_number, emergency_contact, address, registration_date, verification_status
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         user_id,
@@ -55,7 +55,7 @@ class Seller {
         id_number,
         business_name,
         business_type,
-        manager_id || null,
+        created_by_manager_id || null,
         tin_number,
         emergency_contact,
         address,
@@ -63,6 +63,14 @@ class Seller {
         verification_status
       ]
     );
+    // Best-effort: mirror created_by_manager_id into manager_id if such column exists
+    if (created_by_manager_id) {
+      try {
+        await db.query('UPDATE sellers SET manager_id = ? WHERE seller_id = ?', [created_by_manager_id, result.insertId]);
+      } catch (e) {
+        // Column may not exist; ignore
+      }
+    }
 
     return result.insertId;
   }
@@ -121,9 +129,9 @@ class Seller {
       values.push(filters.business_type);
     }
 
-    if (filters.manager_id) {
-      query += ' AND s.manager_id = ?';
-      values.push(filters.manager_id);
+    if (filters.created_by_manager_id) {
+      query += ' AND s.created_by_manager_id = ?';
+      values.push(filters.created_by_manager_id);
     }
 
     if (filters.search) {

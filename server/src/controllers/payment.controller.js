@@ -46,17 +46,10 @@ class PaymentController {
         return res.status(404).json({ success: false, message: 'Payment not found' });
       }
 
-      // Enforce ownership for managers using allocation's manager_id
+      // Enforce ownership for managers using payment.manager_id (from zone)
       const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
-      if (req.user?.user_type === 'manager' && managerId) {
-        const [allocRows] = await db.query(
-          'SELECT manager_id FROM space_allocations WHERE allocation_id = ? LIMIT 1',
-          [payment.allocation_id]
-        );
-        const allocManagerId = allocRows?.[0]?.manager_id;
-        if (!allocManagerId || allocManagerId !== managerId) {
-          return res.status(403).json({ success: false, message: 'Forbidden: payment not owned by manager' });
-        }
+      if (req.user?.user_type === 'manager' && managerId && payment.manager_id !== managerId) {
+        return res.status(403).json({ success: false, message: 'Forbidden: payment not owned by manager' });
       }
 
       res.json({
@@ -101,7 +94,12 @@ class PaymentController {
           return res.status(403).json({ success: false, message: 'Forbidden: manager id missing' });
         }
         const [allocRows] = await db.query(
-          'SELECT manager_id FROM space_allocations WHERE allocation_id = ? AND seller_id = ? LIMIT 1',
+          `SELECT z.manager_id
+           FROM space_allocations sa
+           JOIN spaces sp ON sa.space_id = sp.space_id
+           JOIN zones z ON sp.zone_id = z.zone_id
+           WHERE sa.allocation_id = ? AND sa.seller_id = ?
+           LIMIT 1`,
           [allocation_id, seller_id]
         );
         const allocManagerId = allocRows?.[0]?.manager_id;
@@ -179,7 +177,12 @@ class PaymentController {
           return res.status(403).json({ success: false, message: 'Forbidden: manager id missing' });
         }
         const [allocRows] = await db.query(
-          'SELECT manager_id FROM space_allocations WHERE allocation_id = ? AND seller_id = ? LIMIT 1',
+          `SELECT z.manager_id
+           FROM space_allocations sa
+           JOIN spaces sp ON sa.space_id = sp.space_id
+           JOIN zones z ON sp.zone_id = z.zone_id
+           WHERE sa.allocation_id = ? AND sa.seller_id = ?
+           LIMIT 1`,
           [allocation_id, seller_id]
         );
         const allocManagerId = allocRows?.[0]?.manager_id;
@@ -353,11 +356,16 @@ class PaymentController {
         return res.status(404).json({ success: false, message: 'Payment not found' });
       }
 
-      // Enforce ownership for managers
+      // Enforce ownership for managers via zone ownership
       const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
       if (req.user?.user_type === 'manager' && managerId) {
         const [allocRows] = await db.query(
-          'SELECT manager_id FROM space_allocations WHERE allocation_id = ? LIMIT 1',
+          `SELECT z.manager_id
+           FROM space_allocations sa
+           JOIN spaces sp ON sa.space_id = sp.space_id
+           JOIN zones z ON sp.zone_id = z.zone_id
+           WHERE sa.allocation_id = ?
+           LIMIT 1`,
           [payment.allocation_id]
         );
         const allocManagerId = allocRows?.[0]?.manager_id;
@@ -389,21 +397,14 @@ class PaymentController {
         return res.status(400).json({ success: false, message: 'Status is required' });
       }
 
-      // Enforce ownership for managers
+      // Enforce ownership for managers via zone ownership
       const payment = await Payment.findById(id);
       if (!payment) {
         return res.status(404).json({ success: false, message: 'Payment not found' });
       }
       const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
-      if (req.user?.user_type === 'manager' && managerId) {
-        const [allocRows] = await db.query(
-          'SELECT manager_id FROM space_allocations WHERE allocation_id = ? LIMIT 1',
-          [payment.allocation_id]
-        );
-        const allocManagerId = allocRows?.[0]?.manager_id;
-        if (!allocManagerId || allocManagerId !== managerId) {
-          return res.status(403).json({ success: false, message: 'Forbidden: payment not owned by manager' });
-        }
+      if (req.user?.user_type === 'manager' && managerId && payment.manager_id !== managerId) {
+        return res.status(403).json({ success: false, message: 'Forbidden: payment not owned by manager' });
       }
 
       const updated = await Payment.updateStatus(id, status);

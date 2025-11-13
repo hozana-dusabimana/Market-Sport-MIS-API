@@ -4,7 +4,7 @@ class Space {
   // ✅ Get all spaces (filter by manager, zone, etc.)
   static async findAll(filters = {}) {
     let query = `
-      SELECT s.*, z.zone_name, z.zone_code, z.manager_id as manager_id
+      SELECT s.*, z.zone_name, z.zone_code, s.manager_id as manager_id
       FROM spaces s
       JOIN zones z ON s.zone_id = z.zone_id
       WHERE 1=1
@@ -26,7 +26,11 @@ class Space {
       values.push(filters.space_type);
     }
 
-    if (filters.manager_id) {
+    if (filters.created_by_manager_id) {
+      query += ' AND s.created_by_manager_id = ?';
+      values.push(filters.created_by_manager_id);
+    } else if (filters.manager_id) {
+      // Backward compatibility: owner of zone
       query += ' AND s.manager_id = ?';
       values.push(filters.manager_id);
     }
@@ -45,7 +49,7 @@ class Space {
   // ✅ Find space by ID
   static async findById(spaceId) {
     const [rows] = await db.query(`
-      SELECT s.*, z.zone_name, z.zone_code, z.manager_id
+      SELECT s.*, z.zone_name, z.zone_code, s.manager_id
       FROM spaces s
       JOIN zones z ON s.zone_id = z.zone_id
       WHERE s.space_id = ?
@@ -56,7 +60,7 @@ class Space {
   // ✅ Find available spaces
   static async findAvailable(filters = {}) {
     let query = `
-      SELECT s.*, z.zone_name, z.zone_code, z.manager_id as manager_id
+      SELECT s.*, z.zone_name, z.zone_code, s.manager_id as manager_id
       FROM spaces s
       JOIN zones z ON s.zone_id = z.zone_id
       WHERE s.status = 'available'
@@ -73,7 +77,10 @@ class Space {
       values.push(filters.space_type);
     }
 
-    if (filters.manager_id) {
+    if (filters.created_by_manager_id) {
+      query += ' AND s.created_by_manager_id = ?';
+      values.push(filters.created_by_manager_id);
+    } else if (filters.manager_id) {
       query += ' AND s.manager_id = ?';
       values.push(filters.manager_id);
     }
@@ -89,6 +96,7 @@ class Space {
   const {
     zone_id,
     manager_id,
+    created_by_manager_id,
     space_number,
     space_type,
     size_sqm,
@@ -101,11 +109,11 @@ class Space {
 
   const [result] = await db.query(
     `INSERT INTO spaces (
-      zone_id, manager_id, space_number, space_type, size_sqm,
+      zone_id, manager_id, created_by_manager_id, space_number, space_type, size_sqm,
       daily_rate, weekly_rate, monthly_rate, features, status
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [zone_id, manager_id, space_number, space_type, size_sqm,
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [zone_id, manager_id, created_by_manager_id || null, space_number, space_type, size_sqm,
      daily_rate, weekly_rate, monthly_rate, features, status]
   );
 

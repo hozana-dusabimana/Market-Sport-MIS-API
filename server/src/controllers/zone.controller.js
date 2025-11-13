@@ -169,6 +169,16 @@ class ZoneController {
   async getZoneStats(req, res) {
     try {
       const { id } = req.params;
+      // Verify zone ownership for managers before returning statistics
+      const zone = await Zone.findById(id);
+      if (!zone) {
+        return res.status(404).json({ success: false, message: 'Zone not found' });
+      }
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
+      if (req.user?.user_type === 'manager' && managerId && zone.manager_id !== managerId) {
+        return res.status(403).json({ success: false, message: 'Forbidden: zone not owned by manager' });
+      }
+
       const stats = await Zone.getStatistics(id);
 
       res.json({
