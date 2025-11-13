@@ -172,6 +172,11 @@ class Space {
       values.push(filters.space_type);
     }
 
+    if (filters.manager_id) {
+      query += ' AND z.manager_id = ?';
+      values.push(filters.manager_id);
+    }
+
     if (filters.search) {
       query += ' AND s.space_number LIKE ?';
       values.push(`%${filters.search}%`);
@@ -210,6 +215,11 @@ class Space {
     if (filters.space_type) {
       query += ' AND s.space_type = ?';
       values.push(filters.space_type);
+    }
+
+    if (filters.manager_id) {
+      query += ' AND z.manager_id = ?';
+      values.push(filters.manager_id);
     }
 
     query += ' ORDER BY z.zone_name, s.space_number';

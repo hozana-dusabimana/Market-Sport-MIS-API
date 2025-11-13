@@ -3,36 +3,43 @@ import db from '../config/database.js';
 class Notification {
   static async findAll(filters = {}) {
     let query = `
-      SELECT *
-      FROM notifications
+      SELECT n.*
+      FROM notifications n
+      LEFT JOIN sellers s ON n.seller_id = s.seller_id
       WHERE 1=1
     `;
     const values = [];
 
     if (filters.user_id) {
-      query += ' AND user_id = ?';
+      query += ' AND n.user_id = ?';
       values.push(filters.user_id);
     }
 
     if (filters.seller_id) {
-      query += ' AND seller_id = ?';
+      query += ' AND n.seller_id = ?';
       values.push(filters.seller_id);
     }
 
     if (filters.status) {
-      query += ' AND status = ?';
+      query += ' AND n.status = ?';
       values.push(filters.status);
     }
 
     if (filters.notification_type) {
-      query += ' AND notification_type = ?';
+      query += ' AND n.notification_type = ?';
       values.push(filters.notification_type);
+    }
+
+    if (filters.manager_id) {
+      // Only notifications tied to sellers owned by this manager
+      query += ' AND s.manager_id = ?';
+      values.push(filters.manager_id);
     }
 
     const limit = filters.limit || 100;
     const offset = filters.offset || 0;
     
-    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    query += ' ORDER BY n.created_at DESC LIMIT ? OFFSET ?';
     values.push(limit, offset);
 
     const [rows] = await db.query(query, values);
@@ -176,3 +183,4 @@ class Notification {
 }
 
 export { Notification };
+

@@ -39,6 +39,12 @@ class SellerController {
         limit: parseInt(req.query.limit) || 50
       };
 
+      // Scope to manager's sellers if requester is a manager
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
+      if (req.user?.user_type === 'manager' && managerId) {
+        filters.manager_id = managerId;
+      }
+
       // Build count query for pagination
       let countQuery = `
         SELECT COUNT(*) as total
@@ -62,6 +68,11 @@ class SellerController {
         countQuery += ' AND (s.full_name LIKE ? OR s.business_name LIKE ? OR s.id_number LIKE ?)';
         const searchTerm = `%${filters.search}%`;
         countValues.push(searchTerm, searchTerm, searchTerm);
+      }
+
+      if (filters.manager_id) {
+        countQuery += ' AND s.manager_id = ?';
+        countValues.push(filters.manager_id);
       }
 
       const [countResult] = await db.query(countQuery, countValues);
@@ -89,7 +100,6 @@ class SellerController {
       res.status(500).json({ success: false, message: 'Failed to fetch sellers', error: error.message });
     }
   }
-  
 
   // Get seller by ID with user info
   async getSellerById(req, res) {
@@ -99,6 +109,12 @@ class SellerController {
 
       if (!seller) {
         return res.status(404).json({ success: false, message: 'Seller not found' });
+      }
+
+      // Enforce ownership for managers
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
+      if (req.user?.user_type === 'manager' && managerId && seller.manager_id && seller.manager_id !== managerId) {
+        return res.status(403).json({ success: false, message: 'Forbidden: seller not owned by manager' });
       }
 
       res.json({
@@ -120,6 +136,10 @@ class SellerController {
 
       const {
         user_id,
+        username,
+        email,
+        password,
+        phone_number,
         full_name,
         id_number,
         business_name,
@@ -131,15 +151,32 @@ class SellerController {
         verification_status = 'pending'
       } = req.body;
 
-      if (!user_id || !full_name || !id_number || !business_name || !business_type) {
-        await connection.rollback();
-        return res.status(400).json({ success: false, message: 'Missing required fields' });
+      // Determine manager_id if creator is a manager
+      const creatorIsManager = req.user?.user_type === 'manager';
+      const creatorManagerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id || req.user?.user_id || null;
+
+      let finalUserId = user_id;
+
+      // Support both flows:
+      // 1) Existing user_id provided (legacy flow)
+      // 2) No user_id but username/email/password provided -> create users row first
+      if (!finalUserId) {
+        if (!username || !email || !password || !phone_number) {
+          await connection.rollback();
+          return res.status(400).json({ success: false, message: 'Missing required fields' });
+        }
+        // Create user row with type 'seller'
+        const [userResult] = await connection.query(
+          `INSERT INTO users (username, email, password, phone_number, user_type) VALUES (?, ?, ?, ?, 'seller')`,
+          [username, email, password, phone_number]
+        );
+        finalUserId = userResult.insertId;
       }
 
       // Check if user exists and is of type 'seller'
       const [userRows] = await connection.query(
         'SELECT * FROM users WHERE user_id = ? AND user_type = ?',
-        [user_id, 'seller']
+        [finalUserId, 'seller']
       );
       if (userRows.length === 0) {
         await connection.rollback();
@@ -147,7 +184,7 @@ class SellerController {
       }
 
       // Check if seller profile already exists
-      const existingSeller = await Seller.findByUserId(user_id);
+      const existingSeller = await Seller.findByUserId(finalUserId);
       if (existingSeller) {
         await connection.rollback();
         return res.status(409).json({ success: false, message: 'Seller profile already exists for this user' });
@@ -161,11 +198,12 @@ class SellerController {
       }
 
       const sellerId = await Seller.create({
-        user_id,
+        user_id: finalUserId,
         full_name,
         id_number,
         business_name,
         business_type,
+        manager_id: creatorIsManager ? creatorManagerId : null,
         tin_number,
         emergency_contact,
         address,
@@ -178,7 +216,7 @@ class SellerController {
       res.status(201).json({
         success: true,
         message: 'Seller created successfully',
-        data: { sellerId, user_id }
+        data: { sellerId, user_id: finalUserId, manager_id: creatorIsManager ? creatorManagerId : null }
       });
 
     } catch (error) {
@@ -205,6 +243,13 @@ class SellerController {
       if (!seller) {
         await connection.rollback();
         return res.status(404).json({ success: false, message: 'Seller not found' });
+      }
+
+      // Enforce ownership for managers
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
+      if (req.user?.user_type === 'manager' && managerId && seller.manager_id && seller.manager_id !== managerId) {
+        await connection.rollback();
+        return res.status(403).json({ success: false, message: 'Forbidden: seller not owned by manager' });
       }
 
       const userId = seller.user_id;
@@ -308,6 +353,15 @@ class SellerController {
   async deleteSeller(req, res) {
     try {
       const { id } = req.params;
+      // Enforce ownership for managers
+      const seller = await Seller.findById(id);
+      if (!seller) {
+        return res.status(404).json({ success: false, message: 'Seller not found' });
+      }
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
+      if (req.user?.user_type === 'manager' && managerId && seller.manager_id && seller.manager_id !== managerId) {
+        return res.status(403).json({ success: false, message: 'Forbidden: seller not owned by manager' });
+      }
 
       const deleted = await Seller.delete(id);
 
@@ -326,6 +380,15 @@ class SellerController {
   async getAllocations(req, res) {
     try {
       const { id } = req.params;
+      // Enforce ownership for managers
+      const seller = await Seller.findById(id);
+      if (!seller) {
+        return res.status(404).json({ success: false, message: 'Seller not found' });
+      }
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
+      if (req.user?.user_type === 'manager' && managerId && seller.manager_id && seller.manager_id !== managerId) {
+        return res.status(403).json({ success: false, message: 'Forbidden: seller not owned by manager' });
+      }
       const allocations = await Seller.getAllocations(id);
 
       res.json({
@@ -342,6 +405,15 @@ class SellerController {
   async getPayments(req, res) {
     try {
       const { id } = req.params;
+      // Enforce ownership for managers
+      const seller = await Seller.findById(id);
+      if (!seller) {
+        return res.status(404).json({ success: false, message: 'Seller not found' });
+      }
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
+      if (req.user?.user_type === 'manager' && managerId && seller.manager_id && seller.manager_id !== managerId) {
+        return res.status(403).json({ success: false, message: 'Forbidden: seller not owned by manager' });
+      }
       const payments = await Seller.getPayments(id);
 
       res.json({
@@ -358,6 +430,15 @@ class SellerController {
   async getStatistics(req, res) {
     try {
       const { id } = req.params;
+      // Enforce ownership for managers
+      const seller = await Seller.findById(id);
+      if (!seller) {
+        return res.status(404).json({ success: false, message: 'Seller not found' });
+      }
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
+      if (req.user?.user_type === 'manager' && managerId && seller.manager_id && seller.manager_id !== managerId) {
+        return res.status(403).json({ success: false, message: 'Forbidden: seller not owned by manager' });
+      }
       const stats = await Seller.getStatistics(id);
 
       res.json({

@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import config from '../config/config.js';
 import Blacklist from '../models/Blacklist.model.js';
+import db from '../config/database.js';
 
 const authenticate = async (req, res, next) => {
   try {
@@ -15,7 +16,33 @@ const authenticate = async (req, res, next) => {
 
     // Verify JWT
     const decoded = jwt.verify(token, config.jwt.secret);
-    req.user = decoded; // { userId, username, user_type }
+    req.user = decoded; // { userId, username, user_type, ... }
+
+    // If the user is a manager, enrich the payload with manager_id
+    if (req.user?.user_type === 'manager') {
+      try {
+        // Try existing fields first
+        let managerId = req.user.manager_id || req.user?.profile?.manager_id || null;
+
+        if (!managerId && req.user?.userId) {
+          const [rows] = await db.query(
+            'SELECT manager_id FROM managers WHERE user_id = ? LIMIT 1',
+            [req.user.userId]
+          );
+          managerId = rows?.[0]?.manager_id || null;
+        }
+
+        if (managerId) {
+          // Attach manager_id for consistent access by controllers
+          req.user.manager_id = managerId;
+          req.user.profile = { ...(req.user.profile || {}), manager_id: managerId };
+          // For compatibility with clients expecting id to be manager id
+          req.user.id = managerId;
+        }
+      } catch (e) {
+        // Non-fatal enrichment failure; proceed with decoded token
+      }
+    }
 
     // Check blacklist AFTER verification
     const isBlacklisted = await Blacklist.isBlacklisted(token);
