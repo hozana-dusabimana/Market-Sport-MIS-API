@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { useAuthStore } from '../../store/authStore'
 import { notificationService } from '../../services/notificationService'
+import { sellerService } from '../../services/sellerService'
 import { Bell, Check } from 'lucide-react'
 import { format } from 'date-fns'
 
@@ -8,12 +9,41 @@ const SellerNotifications = () => {
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
 
-  const { data: notificationsData, isLoading } = useQuery(
-    'seller-notifications',
+  // Fetch seller profile to get seller_id
+  const { data: sellerProfile } = useQuery(
+    ['seller-profile-for-notifs', user?.userId],
+    () => sellerService.getByUserId(user!.userId),
+    { enabled: !!user?.userId, retry: false, onError: () => {} }
+  )
+
+  // Fetch notifications addressed to the user (system/admin/manager)
+  const { data: notificationsUserData, isLoading: loadingUser } = useQuery(
+    'seller-user-notifications',
     () => notificationService.getUserNotifications(),
     { enabled: !!user?.userId, retry: false, onError: () => {} }
   )
-  const notifications = notificationsData?.data || []
+
+  // Fetch notifications addressed to the seller_id (payment-related etc.)
+  const sellerId = sellerProfile?.data?.seller_id
+  const { data: notificationsSellerData, isLoading: loadingSeller } = useQuery(
+    ['seller-id-notifications', sellerId],
+    () => notificationService.getAll({ seller_id: sellerId }),
+    { enabled: !!sellerId, retry: false, onError: () => {} }
+  )
+
+  // Merge and de-duplicate notifications
+  const listA = notificationsUserData?.data || []
+  const listB = notificationsSellerData?.data || []
+  const notificationsMap: Record<string, any> = {}
+  ;[...listA, ...listB].forEach((n: any) => {
+    const key = String(n.notification_id || `${n.title}-${n.created_at}`)
+    notificationsMap[key] = n
+  })
+  const notifications = Object.values(notificationsMap).sort((a: any, b: any) => {
+    const ta = a.created_at ? new Date(a.created_at).getTime() : 0
+    const tb = b.created_at ? new Date(b.created_at).getTime() : 0
+    return tb - ta
+  })
 
   const markAsReadMutation = useMutation(
     (id: number) => notificationService.markAsRead(id),
@@ -24,13 +54,23 @@ const SellerNotifications = () => {
     }
   )
 
-  const markAllAsReadMutation = useMutation(() => notificationService.markAllAsRead(), {
+  const markAllAsReadMutation = useMutation(async () => {
+    const unreadIds = notifications
+      .filter((n: any) => n.status === 'unread' || !n.is_read)
+      .map((n: any) => n.notification_id)
+      .filter(Boolean)
+    if (unreadIds.length > 0) {
+      await notificationService.markMultipleAsRead(unreadIds as number[])
+    }
+    return { success: true }
+  }, {
     onSuccess: () => {
-      queryClient.invalidateQueries('seller-notifications')
+      queryClient.invalidateQueries('seller-user-notifications')
+      queryClient.invalidateQueries('seller-id-notifications')
     },
   })
 
-  if (isLoading) {
+  if (loadingUser || loadingSeller) {
     return <div className="text-center py-12">Loading notifications...</div>
   }
 

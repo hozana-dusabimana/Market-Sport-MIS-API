@@ -35,11 +35,16 @@ const ManagerDashboard = () => {
   // --- State ---
   const [showCreateModal, setShowCreateModal] = useState(false)
 
+  // --- Manager scope (must be defined before queries below) ---
+  const isManager = user?.user_type === 'manager'
+  const managedZoneIds = isManager && user?.profile?.assigned_zones ? user.profile.assigned_zones : []
+  const managerId = (user as any)?.profile?.manager_id || (user as any)?.profile?.id || (user as any)?.manager_id || null
+
   // --- Queries ---
   const { data: zonesData } = useQuery('zones', () => zoneService.getAll(), { retry: false, onError: () => {} })
   const { data: spacesData } = useQuery('spaces', () => spaceService.getAll(), { retry: false, onError: () => {} })
   const { data: allocationsData } = useQuery('allocations', () => allocationService.getAll(), { retry: false, onError: () => {} })
-  const { data: sellersData } = useQuery('sellers', () => sellerService.getAll(), { retry: false, onError: () => {} })
+  const { data: sellersData } = useQuery(['sellers', managerId], () => sellerService.getAll(managerId ? { manager_id: managerId } : undefined), { retry: false, onError: () => {} })
 
   const zones = zonesData?.data || []
   const spaces = spacesData?.data || []
@@ -47,21 +52,18 @@ const ManagerDashboard = () => {
   const sellers = sellersData?.data?.sellers || sellersData?.data || []
 
   // --- Filter by manager ---
-  const managedZoneIds = user?.user_type === 'manager' && user?.profile?.assigned_zones
-    ? user.profile.assigned_zones
-    : []
 
-  const managedZones = managedZoneIds.length > 0
+  const managedZones = isManager
     ? zones.filter((z: any) => managedZoneIds.includes(z.zone_id))
     : zones
 
-  const managedSpaces = managedZoneIds.length > 0
-    ? spaces.filter((s: any) => managedZoneIds.includes(s.zone_id))
+  const managedSpaces = isManager
+    ? spaces.filter((s: any) => (managedZoneIds.includes(s.zone_id)) || ((s as any).manager_id === managerId))
     : spaces
 
   const managedSpaceIds = managedSpaces.map((s: any) => s.space_id)
-  const managedAllocations = managedZoneIds.length > 0
-    ? allocations.filter((a: any) => managedSpaceIds.includes(a.space_id))
+  const managedAllocations = isManager
+    ? allocations.filter((a: any) => managedSpaceIds.includes(a.space_id) || (managerId && a.manager_id === managerId))
     : allocations
 
   // Filter sellers by managed zones (sellers who have allocations in managed zones)
@@ -69,7 +71,7 @@ const ManagerDashboard = () => {
     managedAllocations.map((a: any) => a.seller_id).filter(Boolean)
   )
   const managedSellers = managedZoneIds.length > 0
-    ? sellers.filter((s: any) => managedSellerIds.has(s.seller_id) || managedSellerIds.has(s.user_id))
+    ? sellers.filter((s: any) => managedSellerIds.has(s.seller_id) || managedSellerIds.has(s.user_id) || (managerId && s.manager_id === managerId))
     : sellers
 
   // --- Stats ---
@@ -100,6 +102,7 @@ const ManagerDashboard = () => {
         ...data,
         user_type: 'seller',
         registration_date: new Date().toISOString().split('T')[0],
+        manager_id: (user as any)?.profile?.manager_id || (user as any)?.manager_id || undefined,
       }
       return await authService.register(registerData)
     },
@@ -136,8 +139,8 @@ const ManagerDashboard = () => {
 
       {/* Seller Registration Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[95vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 fade-in">
+          <div className="bg-white rounded-xl p-6 w-full max-w-3xl max-h-[95vh] overflow-y-auto slide-up">
             <div className="flex justify-between items-center mb-6">
               <div>
                 <div className="inline-flex items-center justify-center w-12 h-12 bg-primary-100 rounded-full mb-3">

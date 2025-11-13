@@ -1,5 +1,6 @@
 import db from '../config/database.js';
-import { Space } from '../models/Zone.model.js';
+import { Zone } from '../models/Zone.model.js';
+import Space from '../models/Space.model.js';
 
 class SpaceController {
   // Get all spaces with filters
@@ -11,6 +12,12 @@ class SpaceController {
         space_type: req.query.space_type,
         search: req.query.search
       };
+
+      // Auto-scope to manager's zones when requester is a manager
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
+      if (req.user?.user_type === 'manager' && managerId) {
+        filters.manager_id = managerId;
+      }
 
       const spaces = await Space.findAll(filters);
 
@@ -35,6 +42,12 @@ class SpaceController {
         return res.status(404).json({ success: false, message: 'Space not found' });
       }
 
+      // Enforce ownership for managers
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
+      if (req.user?.user_type === 'manager' && managerId && space.manager_id !== managerId) {
+        return res.status(403).json({ success: false, message: 'Forbidden: space not owned by manager' });
+      }
+
       const currentAllocation = await Space.getCurrentAllocation(id);
       const history = await Space.getAllocationHistory(id);
 
@@ -55,6 +68,12 @@ class SpaceController {
         zone_id: req.query.zone_id,
         space_type: req.query.space_type
       };
+
+      // Auto-scope to manager's zones when requester is a manager
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
+      if (req.user?.user_type === 'manager' && managerId) {
+        filters.manager_id = managerId;
+      }
 
       const spaces = await Space.findAvailable(filters);
 
@@ -92,6 +111,18 @@ class SpaceController {
         return res.status(400).json({ success: false, message: 'Zone ID, space number, and type are required' });
       }
 
+      // Enforce ownership: managers can only create spaces in their own zones
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
+      if (req.user?.user_type === 'manager' && managerId) {
+        const zone = await Zone.findById(zone_id);
+        if (!zone) {
+          return res.status(404).json({ success: false, message: 'Zone not found' });
+        }
+        if (zone.manager_id !== managerId) {
+          return res.status(403).json({ success: false, message: 'Forbidden: cannot create space in another manager\'s zone' });
+        }
+      }
+
       const spaceId = await Space.create({
         zone_id,
         space_number,
@@ -124,6 +155,12 @@ class SpaceController {
       const space = await Space.findById(id);
       if (!space) {
         return res.status(404).json({ success: false, message: 'Space not found' });
+      }
+
+      // Enforce ownership for managers
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
+      if (req.user?.user_type === 'manager' && managerId && space.manager_id !== managerId) {
+        return res.status(403).json({ success: false, message: 'Forbidden: space not owned by manager' });
       }
 
       // Map old field names to new field names for backward compatibility
@@ -167,6 +204,16 @@ class SpaceController {
         return res.status(400).json({ success: false, message: 'Status is required' });
       }
 
+      // Enforce ownership for managers
+      const space = await Space.findById(id);
+      if (!space) {
+        return res.status(404).json({ success: false, message: 'Space not found' });
+      }
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
+      if (req.user?.user_type === 'manager' && managerId && space.manager_id !== managerId) {
+        return res.status(403).json({ success: false, message: 'Forbidden: space not owned by manager' });
+      }
+
       const updated = await Space.updateStatus(id, status);
 
       if (!updated) {
@@ -185,6 +232,16 @@ class SpaceController {
     try {
       const { id } = req.params;
 
+      // Enforce ownership for managers
+      const space = await Space.findById(id);
+      if (!space) {
+        return res.status(404).json({ success: false, message: 'Space not found' });
+      }
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
+      if (req.user?.user_type === 'manager' && managerId && space.manager_id !== managerId) {
+        return res.status(403).json({ success: false, message: 'Forbidden: space not owned by manager' });
+      }
+
       const deleted = await Space.delete(id);
 
       if (!deleted) {
@@ -202,6 +259,15 @@ class SpaceController {
   async getAllocationHistory(req, res) {
     try {
       const { id } = req.params;
+      // Enforce ownership for managers
+      const space = await Space.findById(id);
+      if (!space) {
+        return res.status(404).json({ success: false, message: 'Space not found' });
+      }
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
+      if (req.user?.user_type === 'manager' && managerId && space.manager_id !== managerId) {
+        return res.status(403).json({ success: false, message: 'Forbidden: space not owned by manager' });
+      }
       const history = await Space.getAllocationHistory(id);
 
       res.json({
@@ -219,6 +285,15 @@ class SpaceController {
   async checkAvailability(req, res) {
     try {
       const { id } = req.params;
+      // Enforce ownership for managers
+      const space = await Space.findById(id);
+      if (!space) {
+        return res.status(404).json({ success: false, message: 'Space not found' });
+      }
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
+      if (req.user?.user_type === 'manager' && managerId && space.manager_id !== managerId) {
+        return res.status(403).json({ success: false, message: 'Forbidden: space not owned by manager' });
+      }
       const isAvailable = await Space.checkAvailability(id);
 
       res.json({

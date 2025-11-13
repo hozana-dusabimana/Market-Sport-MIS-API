@@ -1,4 +1,4 @@
-import { useQuery } from 'react-query'
+import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { useAuthStore } from '../../store/authStore'
 import { allocationService } from '../../services/allocationService'
 import { paymentService } from '../../services/paymentService'
@@ -7,32 +7,143 @@ import { sellerService } from '../../services/sellerService'
 import { spaceService } from '../../services/spaceService'
 import { zoneService } from '../../services/zoneService'
 import { authService } from '../../services/authService'
-import { Square, CreditCard, Bell, DollarSign, User, AlertCircle, CheckCircle, Clock, XCircle, Link as LinkIcon } from 'lucide-react'
-import { format, differenceInDays, isAfter, parseISO } from 'date-fns'
+import { Square, CreditCard, Bell, DollarSign, User, AlertCircle, CheckCircle, Clock, XCircle, Link as LinkIcon, Plus } from 'lucide-react'
+import { format, differenceInDays, isAfter, parseISO, addMonths, addDays } from 'date-fns'
 import { Link } from 'react-router-dom'
+import { useState, useRef } from 'react'
+import toast from 'react-hot-toast'
+import type { Payment } from '../../services/paymentService'
 
 const SellerDashboard = () => {
   const { user } = useAuthStore()
 
   // First get seller profile to get seller_id
   const userId = user?.userId
-  const { data: sellerProfileResponse, isLoading: profileLoading } = useQuery(
-    ['seller-profile', userId],
-    () => sellerService.getAll({ id: userId }),
-    { enabled: !!userId && user?.user_type === 'seller', retry: false, onError: () => {} }
-  )
-
-  // Also get user profile for complete information
-  const { data: userProfileData } = useQuery(
+  // Get user profile (contains seller profile including seller_id)
+  const { data: userProfileData, isLoading: userProfileLoading } = useQuery(
     ['user-profile', userId],
     () => authService.getProfile(),
     { enabled: !!userId, retry: false, onError: () => {} }
   )
 
-  // Extract seller_id from response - backend returns sellers array when id is provided
-  const sellerProfile = sellerProfileResponse?.data?.sellers?.[0] || sellerProfileResponse?.data
-  const sellerId = sellerProfile?.seller_id || sellerProfile?.user_id || userId
-  const fullSellerProfile = userProfileData?.data || sellerProfile
+  // Extract seller_id from auth profile response
+  const fullSellerProfile = userProfileData
+  const fullProfileAny: any = fullSellerProfile
+  const userObj = fullProfileAny?.data || fullProfileAny
+  const profileObj = userObj?.profile || {}
+  const sellerId = profileObj?.seller_id || userObj?.user_id || userId
+
+  const queryClient = useQueryClient()
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
+  const [paymentForm, setPaymentForm] = useState<Partial<Payment>>({
+    allocation_id: 0,
+    amount: 0,
+    payment_method: 'mobile_money',
+    payment_date: format(new Date(), 'yyyy-MM-dd'),
+    status: 'completed',
+  })
+
+  const createPaymentMutation = useMutation(
+    (payment: Payment) => paymentService.create(payment),
+    {
+      onSuccess: async (_res, _vars) => {
+        queryClient.invalidateQueries(['seller-payments', sellerId])
+        queryClient.invalidateQueries('payments')
+
+        // Auto-extend allocation end date according to allocation type
+        try {
+          const alloc = activeAllocations.find((a: any) => a.allocation_id === paymentForm.allocation_id)
+          if (alloc) {
+            const newEnd = computeNextPeriodEnd(alloc)
+            await allocationService.update(alloc.allocation_id, {
+              end_date: format(newEnd, 'yyyy-MM-dd'),
+            })
+            queryClient.invalidateQueries(['seller-allocations', sellerId])
+            toast.success(`Payment recorded and period extended to ${format(newEnd, 'MMM dd, yyyy')}`)
+          } else {
+            toast.success('Payment recorded successfully')
+          }
+        } catch (e: any) {
+          toast.success('Payment recorded. Failed to extend period automatically.')
+        }
+
+        setIsPaymentModalOpen(false)
+        setPaymentForm({
+          allocation_id: 0,
+          amount: 0,
+          payment_method: 'mobile_money',
+          payment_date: format(new Date(), 'yyyy-MM-dd'),
+          status: 'completed',
+        })
+      },
+      onError: (err: any) => {
+        toast.error(err?.response?.data?.message || 'Failed to record payment')
+      },
+    }
+  )
+
+  // Lanari USSD push initiation (pending/auto)
+  const lanariMutation = useMutation(
+    (payload: {
+      allocation_id: number
+      seller_id: number
+      amount: number
+      customer_phone: string
+      payment_period_start?: string
+      payment_period_end?: string
+      notes?: string
+    }) => paymentService.lanariProcess(payload),
+    {
+      onSuccess: async (res) => {
+        queryClient.invalidateQueries(['seller-payments', sellerId])
+        queryClient.invalidateQueries('payments')
+
+        const apiSuccess = res?.success !== undefined ? res.success : true
+        const status = res?.data?.status || res?.status
+
+        if (!apiSuccess) {
+          const msg = res?.message || 'Failed to initiate mobile money payment'
+          toast.error(msg)
+          // Keep modal open so user can retry or change method
+          return
+        }
+        if (status === 'completed') {
+          try {
+            const alloc = activeAllocations.find((a: any) => a.allocation_id === paymentForm.allocation_id)
+            if (alloc) {
+              const newEnd = computeNextPeriodEnd(alloc)
+              await allocationService.update(alloc.allocation_id, { end_date: format(newEnd, 'yyyy-MM-dd') })
+              queryClient.invalidateQueries(['seller-allocations', sellerId])
+              toast.success(`Payment completed and period extended to ${format(newEnd, 'MMM dd, yyyy')}`)
+            }
+          } catch {
+            toast.success('Payment completed. Failed to extend period automatically.')
+          }
+        } else {
+          toast.success('Payment initiated. Please approve the USSD prompt on your phone. Status: pending')
+        }
+
+        setIsPaymentModalOpen(false)
+        setPaymentForm({
+          allocation_id: 0,
+          amount: 0,
+          payment_method: 'mobile_money',
+          payment_date: format(new Date(), 'yyyy-MM-dd'),
+          status: 'completed',
+        })
+      },
+      onError: (err: any) => {
+        const status = err?.response?.status
+        const serverMsg = err?.response?.data?.message || err?.message || ''
+        if (status === 401 && /api key.*secret required/i.test(serverMsg)) {
+          toast.error('Mobile money is not configured. Please contact the administrator or use another payment method.')
+        } else {
+          toast.error(`Failed to initiate mobile money payment: ${serverMsg}`)
+        }
+        // Keep modal open for retry/change
+      },
+    }
+  )
 
   const { data: allocationsData, isLoading: allocationsLoading } = useQuery(
     ['seller-allocations', sellerId],
@@ -46,10 +157,26 @@ const SellerDashboard = () => {
     { enabled: !!sellerId, retry: false, onError: () => {} }
   )
 
+  const prevUnreadRef = useRef(0)
   const { data: notificationsData } = useQuery(
     'seller-notifications',
     () => notificationService.getUserNotifications(),
-    { enabled: !!userId, retry: false, onError: () => {} }
+    {
+      enabled: !!userId,
+      retry: false,
+      refetchInterval: 30000,
+      refetchOnWindowFocus: true,
+      staleTime: 0,
+      onSuccess: (res: any) => {
+        const items = res?.data || res || []
+        const unread = items.filter((n: any) => !n.is_read).length
+        if (unread > prevUnreadRef.current && prevUnreadRef.current !== 0) {
+          toast.success('You have new notifications from management')
+        }
+        prevUnreadRef.current = unread
+      },
+      onError: () => {},
+    }
   )
 
   const { data: sellerStats } = useQuery(
@@ -109,13 +236,33 @@ const SellerDashboard = () => {
   }, {})
 
   // Get upcoming payment due dates (for active allocations)
+  const computeSuggestedAmount = (space: any, allocation: any) => {
+    const type = (allocation?.allocation_type || '').toLowerCase()
+    if (type.includes('week')) {
+      return Number(space?.weekly_rate ?? (space?.daily_rate ? Number(space.daily_rate) * 7 : 0)) || 0
+    }
+    if (type.includes('day')) {
+      return Number(space?.daily_rate ?? 0) || 0
+    }
+    // default monthly
+    return Number(space?.monthly_rate ?? (space?.daily_rate ? Number(space.daily_rate) * 30 : 0)) || 0
+  }
+
+  const computeNextPeriodEnd = (allocation: any) => {
+    const type = (allocation?.allocation_type || '').toLowerCase()
+    const base = allocation?.end_date ? parseISO(allocation.end_date) : new Date()
+    if (type.includes('week')) return addDays(base, 7)
+    if (type.includes('day')) return addDays(base, 1)
+    return addMonths(base, 1)
+  }
+
   const upcomingPayments = activeAllocations.map((allocation: any) => {
     const space = spaceMap.get(allocation.space_id)
-    const monthlyRate = space?.monthly_rate || space?.daily_rate * 30 || 0
+    const suggested = computeSuggestedAmount(space, allocation)
     return {
       allocation,
       space,
-      amount: monthlyRate,
+      amount: Number(suggested) || 0,
       nextDueDate: allocation.end_date ? parseISO(allocation.end_date) : null,
     }
   }).filter((p: any) => p.nextDueDate && isAfter(p.nextDueDate, new Date()))
@@ -123,7 +270,7 @@ const SellerDashboard = () => {
     .slice(0, 3)
 
   // Get verification status
-  const verificationStatus = sellerProfile?.verification_status || fullSellerProfile?.profile?.verification_status || 'pending'
+  const verificationStatus = profileObj?.verification_status || 'pending'
   const verificationStatusConfig = {
     verified: { icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-100', label: 'Verified' },
     pending: { icon: Clock, color: 'text-yellow-600', bgColor: 'bg-yellow-100', label: 'Pending Verification' },
@@ -164,7 +311,7 @@ const SellerDashboard = () => {
     },
   ]
 
-  if (profileLoading || allocationsLoading || paymentsLoading) {
+  if (userProfileLoading || allocationsLoading || paymentsLoading) {
     return <div className="text-center py-12">Loading dashboard...</div>
   }
 
@@ -175,13 +322,22 @@ const SellerDashboard = () => {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Seller Dashboard</h1>
           <p className="text-gray-600 mt-1">
-            Welcome back, {fullSellerProfile?.profile?.full_name || sellerProfile?.full_name || user?.username || 'Seller'}!
+            Welcome back, {profileObj?.full_name || user?.username || 'Seller'}!
           </p>
         </div>
-        <Link to="/profile" className="btn btn-secondary flex items-center space-x-2">
-          <User size={18} />
-          <span>Edit Profile</span>
-        </Link>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setIsPaymentModalOpen(true)}
+            className="btn btn-primary flex items-center space-x-2"
+          >
+            <Plus size={18} />
+            <span>Make Payment</span>
+          </button>
+          <Link to="/profile" className="btn btn-secondary flex items-center space-x-2">
+            <User size={18} />
+            <span>Edit Profile</span>
+          </Link>
+        </div>
       </div>
 
       {/* Verification Status Banner */}
@@ -252,7 +408,7 @@ const SellerDashboard = () => {
             </div>
             <div className="bg-gray-50 p-4 rounded-lg">
               <p className="text-sm text-gray-600">Total Paid</p>
-              <p className="text-2xl font-bold text-green-600">${(sellerStats.data.total_paid || totalPaid).toFixed(2)}</p>
+              <p className="text-2xl font-bold text-green-600">${Number(sellerStats.data?.total_paid ?? totalPaid).toFixed(2)}</p>
             </div>
           </div>
         </div>
@@ -274,7 +430,7 @@ const SellerDashboard = () => {
               {activeAllocations.slice(0, 3).map((allocation: any) => {
                 const space = spaceMap.get(allocation.space_id)
                 const zone = space ? zoneMap.get(space.zone_id) : null
-                const monthlyRate = space?.monthly_rate || space?.daily_rate * 30 || 0
+                const monthlyRate = Number(space?.monthly_rate ?? (space?.daily_rate ? Number(space.daily_rate) * 30 : 0)) || 0
                 const daysRemaining = allocation.end_date 
                   ? differenceInDays(parseISO(allocation.end_date), new Date())
                   : null
@@ -303,7 +459,7 @@ const SellerDashboard = () => {
                       </div>
                       <div>
                         <p className="text-gray-600">Monthly Rate</p>
-                        <p className="font-medium text-gray-900">${monthlyRate.toFixed(2)}</p>
+                        <p className="font-medium text-gray-900">${Number(monthlyRate).toFixed(2)}</p>
                       </div>
                       {allocation.end_date && (
                         <div className="col-span-2">
@@ -338,13 +494,13 @@ const SellerDashboard = () => {
             <div>
               <p className="text-sm text-gray-600">Business Name</p>
               <p className="font-medium text-gray-900">
-                {sellerProfile?.business_name || fullSellerProfile?.profile?.business_name || 'N/A'}
+                {profileObj?.business_name || 'N/A'}
               </p>
             </div>
             <div>
               <p className="text-sm text-gray-600">Business Type</p>
               <p className="font-medium text-gray-900">
-                {sellerProfile?.business_type || fullSellerProfile?.profile?.business_type || 'N/A'}
+                {profileObj?.business_type || 'N/A'}
               </p>
             </div>
             <div>
@@ -359,8 +515,8 @@ const SellerDashboard = () => {
             <div>
               <p className="text-sm text-gray-600">Registration Date</p>
               <p className="font-medium text-gray-900">
-                {sellerProfile?.registration_date 
-                  ? format(new Date(sellerProfile.registration_date), 'MMM dd, yyyy')
+                {profileObj?.registration_date 
+                  ? format(new Date(profileObj.registration_date), 'MMM dd, yyyy')
                   : 'N/A'}
               </p>
             </div>
@@ -473,13 +629,30 @@ const SellerDashboard = () => {
             {upcomingPayments.map((payment: any, index: number) => (
               <div key={index} className="border border-yellow-200 bg-yellow-50 rounded-lg p-4">
                 <p className="text-sm text-gray-600">Space: {payment.space?.space_number || payment.space?.space_code || 'N/A'}</p>
-                <p className="text-lg font-bold text-gray-900 mt-1">${payment.amount.toFixed(2)}</p>
+                <p className="text-lg font-bold text-gray-900 mt-1">${Number(payment.amount).toFixed(2)}</p>
                 <p className="text-sm text-gray-600 mt-2">
                   Due: {format(payment.nextDueDate, 'MMM dd, yyyy')}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
                   {differenceInDays(payment.nextDueDate, new Date())} days remaining
                 </p>
+                <div className="mt-3">
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => {
+                      setPaymentForm({
+                        allocation_id: payment.allocation.allocation_id,
+                        amount: Number(payment.amount) || 0,
+                        payment_method: 'mobile_money',
+                        payment_date: format(new Date(), 'yyyy-MM-dd'),
+                        status: 'completed',
+                      })
+                      setIsPaymentModalOpen(true)
+                    }}
+                  >
+                    Pay Now
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -573,6 +746,166 @@ const SellerDashboard = () => {
           </Link>
         </div>
       </div>
+
+      {isPaymentModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-2xl font-bold mb-4">Make a Payment</h2>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                if (paymentForm.payment_method === 'mobile_money' && paymentForm.mobile_money_number) {
+                  lanariMutation.mutate({
+                    allocation_id: paymentForm.allocation_id!,
+                    seller_id: sellerId!,
+                    amount: Number(paymentForm.amount) || 0,
+                    customer_phone: paymentForm.mobile_money_number,
+                    notes: paymentForm.notes,
+                  })
+                } else {
+                  createPaymentMutation.mutate({ ...(paymentForm as Payment), seller_id: sellerId! })
+                }
+              }}
+              className="space-y-4"
+            >
+              {/* Recommendation */}
+              {!!paymentForm.allocation_id && (
+                <div className="p-3 rounded bg-gray-50 border border-gray-200 text-sm">
+                  {(() => {
+                    const alloc = activeAllocations.find((a: any) => a.allocation_id === paymentForm.allocation_id)
+                    const space = alloc ? spaceMap.get(alloc.space_id) : null
+                    const suggested = alloc && space ? computeSuggestedAmount(space, alloc) : 0
+                    const nextEnd = alloc ? computeNextPeriodEnd(alloc) : null
+                    return (
+                      <div className="flex flex-col gap-1">
+                        <span>Suggested amount: <strong>${Number(suggested).toFixed(2)}</strong></span>
+                        {nextEnd && (
+                          <span>New period ends on: <strong>{format(nextEnd, 'MMM dd, yyyy')}</strong></span>
+                        )}
+                      </div>
+                    )
+                  })()}
+                </div>
+              )}
+              <div>
+                <label className="label">Allocation *</label>
+                <select
+                  value={paymentForm.allocation_id || 0}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, allocation_id: parseInt(e.target.value) })}
+                  className="input"
+                  required
+                >
+                  <option value={0}>Select Allocation</option>
+                  {activeAllocations.map((a: any) => (
+                    <option key={a.allocation_id} value={a.allocation_id}>
+                      Allocation #{a.allocation_id} - Space {a.space_id}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="label">Amount ($) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={paymentForm.amount || ''}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, amount: parseFloat(e.target.value) })}
+                  className="input"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="label">Payment Method *</label>
+                <select
+                  value={paymentForm.payment_method as any}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, payment_method: e.target.value as any })}
+                  className="input"
+                  required
+                >
+                  <option value="mobile_money">Mobile Money</option>
+                  <option value="bank_transfer">Bank Transfer</option>
+                  <option value="cash">Cash</option>
+                  <option value="card">Card</option>
+                </select>
+              </div>
+
+              {paymentForm.payment_method === 'mobile_money' && (
+                <>
+                  <div>
+                    <label className="label">Mobile Money Number *</label>
+                    <input
+                      type="tel"
+                      value={paymentForm.mobile_money_number || ''}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, mobile_money_number: e.target.value })}
+                      className="input"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Provider</label>
+                    <select
+                      value={paymentForm.mobile_money_provider || ''}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, mobile_money_provider: e.target.value })}
+                      className="input"
+                    >
+                      <option value="">Select Provider</option>
+                      <option value="mtn">MTN</option>
+                      <option value="airtel">Airtel</option>
+                      <option value="orange">Orange</option>
+                    </select>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    You will receive a USSD prompt on your phone to approve this payment.
+                  </div>
+                </>
+              )}
+
+              <div>
+                <label className="label">Payment Date *</label>
+                <input
+                  type="date"
+                  value={paymentForm.payment_date as string}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, payment_date: e.target.value })}
+                  className="input"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="label">Reference</label>
+                <input
+                  type="text"
+                  value={paymentForm.payment_reference || ''}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, payment_reference: e.target.value })}
+                  className="input"
+                  placeholder="Transaction reference"
+                />
+              </div>
+
+              <div>
+                <label className="label">Notes</label>
+                <textarea
+                  value={paymentForm.notes || ''}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                  className="input"
+                  rows={2}
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setIsPaymentModalOpen(false)} className="btn btn-outline">
+                  Cancel
+                </button>
+                <button type="submit" disabled={createPaymentMutation.isLoading} className="btn btn-primary">
+                  {createPaymentMutation.isLoading ? 'Processing...' : 'Pay Now'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

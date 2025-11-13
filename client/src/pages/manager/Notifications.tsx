@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { notificationService, Notification } from '../../services/notificationService'
+import { allocationService } from '../../services/allocationService'
+import { spaceService } from '../../services/spaceService'
+import { sellerService } from '../../services/sellerService'
+import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
 import { Plus, Bell, Check, X, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
@@ -18,6 +22,9 @@ const ManagerNotifications = () => {
   const [typeFilter, setTypeFilter] = useState<string>('all')
   
   const queryClient = useQueryClient()
+  const { user } = useAuthStore()
+  const managedZoneIds = user?.profile?.assigned_zones || []
+  const managerId = (user as any)?.profile?.manager_id || (user as any)?.manager_id || null
   
   const { data: notificationsData, isLoading } = useQuery(
     ['notifications', statusFilter, typeFilter],
@@ -31,7 +38,42 @@ const ManagerNotifications = () => {
     }
   )
   
-  const notifications = notificationsData?.data || []
+  // Fetch sellers/allocations/spaces to derive managed sellers for scoping
+  const { data: allocationsData } = useQuery(
+    ['allocations-for-notifs', managedZoneIds],
+    () => allocationService.getAll(),
+    { retry: false, onError: () => {} }
+  )
+  const { data: spacesData } = useQuery(
+    ['spaces-for-notifs', managedZoneIds],
+    () => spaceService.getAll(),
+    { retry: false, onError: () => {} }
+  )
+  const { data: sellersData } = useQuery(
+    ['sellers-for-notifs', managedZoneIds, managerId],
+    () => sellerService.getAll(managerId ? { manager_id: managerId } : undefined),
+    { retry: false, onError: () => {} }
+  )
+
+  const allNotifs = notificationsData?.data || []
+  const allAllocations = allocationsData?.data || []
+  const allSpaces = spacesData?.data || []
+  const sellers = sellersData?.data?.sellers || sellersData?.data || []
+
+  // Derive managed sellers through allocations -> spaces -> zones
+  const managedSpaces = managedZoneIds.length > 0
+    ? allSpaces.filter((s: any) => managedZoneIds.includes(s.zone_id))
+    : allSpaces
+  const managedSpaceIds = managedSpaces.map((s: any) => s.space_id)
+  const managedAllocations = managedZoneIds.length > 0
+    ? allAllocations.filter((a: any) => managedSpaceIds.includes(a.space_id))
+    : allAllocations
+  const managedSellerIds = Array.from(new Set(managedAllocations.map((a: any) => a.seller_id)))
+
+  // Filter notifications to those tied to managed sellers when manager
+  const notifications = managedZoneIds.length > 0
+    ? allNotifs.filter((n: any) => !n.seller_id || managedSellerIds.includes(n.seller_id))
+    : allNotifs
 
   const createMutation = useMutation(
     (notification: Notification) => notificationService.create(notification),
@@ -175,14 +217,14 @@ const ManagerNotifications = () => {
                 <div
                   key={notification.notification_id}
                   className={`border rounded-lg p-4 ${
-                    isUnread ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200'
+                    isUnread ? 'bg-blue-50 border-blue-200' : 'bg-white border-neutral-200'
                   }`}
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-2">
-                        <Bell className={`w-5 h-5 ${isUnread ? 'text-blue-600' : 'text-gray-400'}`} />
-                        <h3 className={`font-semibold ${isUnread ? 'text-gray-900' : 'text-gray-700'}`}>
+                        <Bell className={`w-5 h-5 ${isUnread ? 'text-blue-600' : 'text-neutral-400'}`} />
+                        <h3 className={`font-semibold ${isUnread ? 'text-neutral-900' : 'text-neutral-700'}`}>
                           {notification.title}
                         </h3>
                         <span
@@ -199,8 +241,8 @@ const ManagerNotifications = () => {
                           {notification.notification_type}
                         </span>
                       </div>
-                      <p className="text-gray-600 text-sm mb-2">{notification.message}</p>
-                      <div className="flex items-center space-x-4 text-xs text-gray-500">
+                      <p className="text-neutral-700 text-sm mb-2">{notification.message}</p>
+                      <div className="flex items-center space-x-4 text-xs text-neutral-500">
                         {notification.user_id && (
                           <span>User ID: {notification.user_id}</span>
                         )}
@@ -258,8 +300,8 @@ const ManagerNotifications = () => {
               )
             })
           ) : (
-            <div className="text-center py-12 text-gray-500">
-              <Bell className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <div className="text-center py-12 text-neutral-500 fade-in">
+              <Bell className="w-12 h-12 text-neutral-400 mx-auto mb-4" />
               <p>No notifications found</p>
             </div>
           )}
@@ -268,10 +310,28 @@ const ManagerNotifications = () => {
 
       {/* Create Notification Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 fade-in">
+          <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto slide-up">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Send Notification</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="label">Seller (scoped to your market)</label>
+                <select
+                  value={formData.seller_id || 0}
+                  onChange={(e) => setFormData({ ...formData, seller_id: e.target.value ? parseInt(e.target.value) : undefined })}
+                  className="input"
+                >
+                  <option value={0}>Select Seller (optional)</option>
+                  {sellers
+                    .filter((s: any) => managedZoneIds.length === 0 || managedSellerIds.includes(s.seller_id || s.user_id) || (managerId && s.manager_id === managerId))
+                    .map((s: any) => (
+                      <option key={s.seller_id || s.user_id} value={s.seller_id || s.user_id}>
+                        {s.business_name || s.full_name || s.user?.username || 'Seller'}
+                      </option>
+                    ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">You can also fill User ID or Seller ID directly below if needed.</p>
+              </div>
               <div>
                 <label className="label">User ID (optional)</label>
                 <input

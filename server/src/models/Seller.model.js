@@ -36,6 +36,7 @@ class Seller {
       id_number,
       business_name,
       business_type,
+      manager_id,
       tin_number,
       emergency_contact,
       address,
@@ -46,14 +47,15 @@ class Seller {
     const [result] = await db.query(
       `INSERT INTO sellers (
         user_id, full_name, id_number, business_name, business_type,
-        tin_number, emergency_contact, address, registration_date, verification_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        manager_id, tin_number, emergency_contact, address, registration_date, verification_status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         user_id,
         full_name,
         id_number,
         business_name,
         business_type,
+        manager_id || null,
         tin_number,
         emergency_contact,
         address,
@@ -117,6 +119,11 @@ class Seller {
     if (filters.business_type) {
       query += ' AND s.business_type = ?';
       values.push(filters.business_type);
+    }
+
+    if (filters.manager_id) {
+      query += ' AND s.manager_id = ?';
+      values.push(filters.manager_id);
     }
 
     if (filters.search) {

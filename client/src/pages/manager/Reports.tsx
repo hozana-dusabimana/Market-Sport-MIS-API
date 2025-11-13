@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useQuery } from 'react-query'
 import { reportService } from '../../services/reportService'
-import { Calendar, Download, FileText } from 'lucide-react'
-import { format, subDays, startOfWeek, startOfMonth } from 'date-fns'
+import { Download } from 'lucide-react'
+import { format, subDays, startOfWeek } from 'date-fns'
 import {
   BarChart,
   Bar,
@@ -25,16 +25,17 @@ const ManagerReports = () => {
   const [weekStart, setWeekStart] = useState(format(startOfWeek(new Date()), 'yyyy-MM-dd'))
   const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'))
 
+  // === Queries ===
   const { data: dailyReport, isLoading: dailyLoading } = useQuery(
     ['daily-report', date],
     () => reportService.getDailyReport(date),
-    { enabled: reportType === 'daily', retry: false, onError: () => {} }
+    { enabled: reportType === 'daily', retry: false }
   )
 
   const { data: weeklyReport, isLoading: weeklyLoading } = useQuery(
     ['weekly-report', weekStart],
     () => reportService.getWeeklyReport(weekStart),
-    { enabled: reportType === 'weekly', retry: false, onError: () => {} }
+    { enabled: reportType === 'weekly', retry: false }
   )
 
   const { data: monthlyReport, isLoading: monthlyLoading } = useQuery(
@@ -43,7 +44,7 @@ const ManagerReports = () => {
       const [year, monthNum] = month.split('-')
       return reportService.getMonthlyReport(monthNum, year)
     },
-    { enabled: reportType === 'monthly', retry: false, onError: () => {} }
+    { enabled: reportType === 'monthly', retry: false }
   )
 
   const { data: occupancyReportData } = useQuery(
@@ -53,10 +54,7 @@ const ManagerReports = () => {
         format(subDays(new Date(), 30), 'yyyy-MM-dd'),
         format(new Date(), 'yyyy-MM-dd')
       ),
-    {
-      retry: false,
-      onError: () => {},
-    }
+    { retry: false }
   )
 
   const { data: paymentReportData } = useQuery(
@@ -66,19 +64,16 @@ const ManagerReports = () => {
         format(subDays(new Date(), 30), 'yyyy-MM-dd'),
         format(new Date(), 'yyyy-MM-dd')
       ),
-    {
-      retry: false,
-      onError: () => {},
-    }
+    { retry: false }
   )
 
-  // Extract data from backend responses
+  // === Safe Data Extraction ===
   const occupancyReport = occupancyReportData?.data || occupancyReportData || { occupied: 0, available: 0 }
-  const paymentReportDataFromBackend = paymentReportData?.data || paymentReportData
-  const paymentReport = paymentReportDataFromBackend || { data: [], by_method: [] }
+  const paymentReport = paymentReportData?.data || paymentReportData || { data: [], by_method: [] }
 
   const isLoading = dailyLoading || weeklyLoading || monthlyLoading
 
+  // === Export Function ===
   const handleExport = async (type: string) => {
     try {
       const params =
@@ -102,8 +97,12 @@ const ManagerReports = () => {
 
   const COLORS = ['#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
 
+  // === Helper Function ===
+  const safeNumber = (val: any) => Number(val) || 0
+
   return (
     <div>
+      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Reports & Analytics</h1>
         <div className="flex space-x-2">
@@ -132,12 +131,7 @@ const ManagerReports = () => {
           {reportType === 'daily' && (
             <div>
               <label className="label">Select Date</label>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="input"
-              />
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input" />
             </div>
           )}
           {reportType === 'weekly' && (
@@ -169,26 +163,25 @@ const ManagerReports = () => {
         <div className="text-center py-12">Loading report...</div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Occupancy Rate Chart */}
+          {/* Occupancy Chart */}
           <div className="card">
             <h2 className="text-xl font-semibold mb-4">Occupancy Rate</h2>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
                   data={[
-                    { name: 'Occupied', value: occupancyReport?.occupied || occupancyReport?.data?.occupied || 0 },
-                    { name: 'Available', value: occupancyReport?.available || occupancyReport?.data?.available || 0 },
+                    { name: 'Occupied', value: safeNumber(occupancyReport?.occupied) },
+                    { name: 'Available', value: safeNumber(occupancyReport?.available) },
                   ]}
                   cx="50%"
                   cy="50%"
+                  outerRadius={80}
                   labelLine={false}
                   label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
                   dataKey="value"
                 >
-                  {[0, 1].map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  {[0, 1].map((_, i) => (
+                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip />
@@ -196,11 +189,11 @@ const ManagerReports = () => {
             </ResponsiveContainer>
           </div>
 
-          {/* Payment Trends Chart */}
+          {/* Payment Trend Chart */}
           <div className="card">
             <h2 className="text-xl font-semibold mb-4">Payment Trends</h2>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={Array.isArray(paymentReport) ? paymentReport : (paymentReport?.data || [])}>
+              <LineChart data={Array.isArray(paymentReport) ? paymentReport : paymentReport?.data || []}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis />
@@ -211,7 +204,7 @@ const ManagerReports = () => {
             </ResponsiveContainer>
           </div>
 
-          {/* Revenue by Payment Method */}
+          {/* Revenue by Method */}
           <div className="card lg:col-span-2">
             <h2 className="text-xl font-semibold mb-4">Revenue by Payment Method</h2>
             <ResponsiveContainer width="100%" height={300}>
@@ -226,76 +219,41 @@ const ManagerReports = () => {
             </ResponsiveContainer>
           </div>
 
-          {/* Report Summary Cards */}
+          {/* Summary Section */}
           {(dailyReport || weeklyReport || monthlyReport) && (
             <div className="card lg:col-span-2">
               <h2 className="text-xl font-semibold mb-4">Report Summary</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {dailyReport?.data && (
-                  <>
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-600">Total Revenue</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        ${(dailyReport.data.total_revenue || 0).toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="bg-green-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-600">Total Payments</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {dailyReport.data.total_payments || 0}
-                      </p>
-                    </div>
-                    <div className="bg-purple-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-600">Active Allocations</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {dailyReport.data.active_allocations || 0}
-                      </p>
-                    </div>
-                  </>
-                )}
-                {weeklyReport?.data && (
-                  <>
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-600">Total Revenue</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        ${(weeklyReport.data.total_revenue || 0).toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="bg-green-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-600">Total Payments</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {weeklyReport.data.total_payments || 0}
-                      </p>
-                    </div>
-                    <div className="bg-purple-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-600">Active Allocations</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {weeklyReport.data.active_allocations || 0}
-                      </p>
-                    </div>
-                  </>
-                )}
-                {monthlyReport?.data && (
-                  <>
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-600">Total Revenue</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        ${(monthlyReport.data.total_revenue || 0).toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="bg-green-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-600">Total Payments</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {monthlyReport.data.total_payments || 0}
-                      </p>
-                    </div>
-                    <div className="bg-purple-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-600">Active Allocations</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {monthlyReport.data.active_allocations || 0}
-                      </p>
-                    </div>
-                  </>
+                {['daily', 'weekly', 'monthly'].map(
+                  (type) =>
+                    reportType === type &&
+                    (() => {
+                      const data =
+                        type === 'daily'
+                          ? dailyReport?.data
+                          : type === 'weekly'
+                          ? weeklyReport?.data
+                          : monthlyReport?.data
+                      if (!data) return null
+                      return (
+                        <>
+                          <div className="bg-blue-50 p-4 rounded-lg">
+                            <p className="text-sm text-gray-600">Total Revenue</p>
+                            <p className="text-2xl font-bold text-gray-900">
+                              ${safeNumber(data.total_revenue).toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="bg-green-50 p-4 rounded-lg">
+                            <p className="text-sm text-gray-600">Total Payments</p>
+                            <p className="text-2xl font-bold text-gray-900">{safeNumber(data.total_payments)}</p>
+                          </div>
+                          <div className="bg-purple-50 p-4 rounded-lg">
+                            <p className="text-sm text-gray-600">Active Allocations</p>
+                            <p className="text-2xl font-bold text-gray-900">{safeNumber(data.active_allocations)}</p>
+                          </div>
+                        </>
+                      )
+                    })()
                 )}
               </div>
             </div>
@@ -307,4 +265,3 @@ const ManagerReports = () => {
 }
 
 export default ManagerReports
-

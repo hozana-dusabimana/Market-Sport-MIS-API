@@ -37,6 +37,12 @@ class Allocation {
       values.push(filters.zone_id);
     }
 
+    if (filters.manager_id) {
+      // Strict: only allocations created by this manager
+      query += ' AND sa.manager_id = ?';
+      values.push(filters.manager_id);
+    }
+
     if (filters.status) {
       query += ' AND sa.status = ?';
       values.push(filters.status);
@@ -101,6 +107,7 @@ class Allocation {
     const {
       seller_id,
       space_id,
+      manager_id,
       allocation_date,
       start_date,
       end_date,
@@ -112,10 +119,10 @@ class Allocation {
 
     const [result] = await db.query(
       `INSERT INTO space_allocations 
-       (seller_id, space_id, allocation_date, start_date, end_date, 
+       (seller_id, space_id, manager_id, allocation_date, start_date, end_date, 
         allocation_type, status, approved_by, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [seller_id, space_id, allocation_date, start_date, end_date,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [seller_id, space_id, manager_id || null, allocation_date, start_date, end_date,
        allocation_type, status, approved_by, notes]
     );
 
@@ -277,7 +284,8 @@ class Payment {
         s.business_name,
         sp.space_number,
         z.zone_name,
-        sa.allocation_type
+        sa.allocation_type,
+        sa.manager_id as manager_id
       FROM payments p
       JOIN sellers s ON p.seller_id = s.seller_id
       JOIN space_allocations sa ON p.allocation_id = sa.allocation_id
@@ -305,6 +313,12 @@ class Payment {
     if (filters.payment_method) {
       query += ' AND p.payment_method = ?';
       values.push(filters.payment_method);
+    }
+
+    if (filters.manager_id) {
+      // Strict: only payments for allocations created by this manager
+      query += ' AND sa.manager_id = ?';
+      values.push(filters.manager_id);
     }
 
     if (filters.date_from) {
@@ -338,7 +352,8 @@ class Payment {
         sp.space_type,
         z.zone_name,
         z.zone_code,
-        sa.allocation_type
+        sa.allocation_type,
+        sa.manager_id as manager_id
       FROM payments p
       JOIN sellers s ON p.seller_id = s.seller_id
       JOIN users u ON s.user_id = u.user_id

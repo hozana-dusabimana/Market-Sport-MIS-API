@@ -4,109 +4,104 @@ import { allocationService } from '../../services/allocationService'
 import { sellerService } from '../../services/sellerService'
 import { spaceService } from '../../services/spaceService'
 import { Square, Calendar, DollarSign } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
+import { authService } from '../../services/authService'
 
 const SellerSpaces = () => {
   const { user } = useAuthStore()
-
-  // First get seller profile to get seller_id
   const userId = user?.userId
-  const { data: sellerProfileResponse, isLoading: profileLoading } = useQuery(
-    ['seller-profile', userId],
-    () => sellerService.getAll({ id: userId }),
-    { enabled: !!userId && user?.user_type === 'seller', retry: false, onError: () => {} }
+
+  // Get user profile to derive seller_id
+  const { data: userProfileData, isLoading: userProfileLoading } = useQuery(
+    ['user-profile', userId],
+    () => authService.getProfile(),
+    { enabled: !!userId, retry: false, onError: () => {} }
   )
+  const sellerId = userProfileData?.data?.profile?.seller_id || userProfileData?.data?.user_id || userId
 
-  // Extract seller_id from response
-  const sellerProfile = sellerProfileResponse?.data?.sellers?.[0] || sellerProfileResponse?.data
-  const sellerId = sellerProfile?.seller_id || sellerProfile?.user_id || userId
-
+  // Get allocations
   const { data: allocationsData, isLoading: allocationsLoading } = useQuery(
     ['seller-allocations', sellerId],
     () => allocationService.getAll({ seller_id: sellerId }),
     { enabled: !!sellerId, retry: false, onError: () => {} }
   )
-
   const allocations = allocationsData?.data || []
 
-  // Fetch space details for each allocation
+  // Fetch space details
   const spaceIds = allocations.map((a: any) => a.space_id).filter(Boolean)
   const { data: spacesData } = useQuery(
     ['spaces', spaceIds],
     () => Promise.all(spaceIds.map((id: number) => spaceService.getById(id))),
     { enabled: spaceIds.length > 0, retry: false, onError: () => {} }
   )
-
-  const spaces = spacesData?.map((s: any) => s?.data) || []
-
-  // Create a map of space_id to space details
+  const spaces = spacesData?.map((s: any) => s?.data).filter(Boolean) || []
   const spaceMap = new Map(spaces.map((s: any) => [s?.space_id, s]))
 
-  if (profileLoading || allocationsLoading) {
+  if (userProfileLoading || allocationsLoading) {
     return <div className="text-center py-12">Loading your spaces...</div>
   }
 
-  const activeAllocations = allocations.filter((a: any) => a.status === 'active') || []
-  const expiredAllocations = allocations.filter((a: any) => a.status === 'expired' || a.status === 'terminated') || []
+  const activeAllocations = allocations.filter((a: any) => a.status === 'active')
+  const expiredAllocations = allocations.filter((a: any) => a.status === 'expired' || a.status === 'terminated')
 
   return (
     <div>
       <h1 className="text-3xl font-bold text-gray-900 mb-6">My Spaces</h1>
 
+      {/* Active Allocations */}
       {activeAllocations.length > 0 && (
         <div className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Active Allocations</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {activeAllocations.map((allocation: any) => (
-              <div key={allocation.allocation_id} className="card">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 bg-primary-100 rounded-lg">
-                    <Square className="w-6 h-6 text-primary-600" />
-                  </div>
-                  <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                    Active
-                  </span>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  {spaceMap.get(allocation.space_id)?.space_number || spaceMap.get(allocation.space_id)?.space_code || `Space #${allocation.space_id}`}
-                </h3>
-                <div className="space-y-2 text-sm text-gray-600">
-                  <div className="flex items-center space-x-2">
-                    <Calendar size={16} />
-                    <span>
-                      Started: {format(new Date(allocation.start_date), 'MMM dd, yyyy')}
+            {activeAllocations.map((allocation: any) => {
+              const space = spaceMap.get(allocation.space_id)
+              const monthlyRate = Number(space?.monthly_rate || space?.daily_rate || 0).toFixed(2)
+              return (
+                <div key={allocation.allocation_id} className="card p-4 shadow-sm hover:shadow-lg transition">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 bg-primary-100 rounded-lg">
+                      <Square className="w-6 h-6 text-primary-600" />
+                    </div>
+                    <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                      Active
                     </span>
                   </div>
-                  {allocation.end_date && (
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    {space?.space_number || space?.space_code || `Space #${allocation.space_id}`}
+                  </h3>
+                  <div className="space-y-2 text-sm text-gray-600">
                     <div className="flex items-center space-x-2">
                       <Calendar size={16} />
-                      <span>
-                        Ends: {format(new Date(allocation.end_date), 'MMM dd, yyyy')}
-                      </span>
+                      <span>Started: {allocation.start_date ? format(parseISO(allocation.start_date), 'MMM dd, yyyy') : 'N/A'}</span>
                     </div>
-                  )}
-                  <div className="flex items-center space-x-2">
-                    <DollarSign size={16} />
-                    <span className="font-semibold text-gray-900">
-                      ${(spaceMap.get(allocation.space_id)?.monthly_rate || spaceMap.get(allocation.space_id)?.daily_rate || 0).toFixed(2)}/month
-                    </span>
+                    {allocation.end_date && (
+                      <div className="flex items-center space-x-2">
+                        <Calendar size={16} />
+                        <span>Ends: {format(parseISO(allocation.end_date), 'MMM dd, yyyy')}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center space-x-2">
+                      <DollarSign size={16} />
+                      <span className="font-semibold text-gray-900">${monthlyRate}/month</span>
+                    </div>
+                    {space?.zone_id && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        Zone: {space.zone_id}
+                      </div>
+                    )}
                   </div>
-                  {spaceMap.get(allocation.space_id)?.zone_id && (
-                    <div className="text-xs text-gray-500 mt-1">
-                      Zone: {spaceMap.get(allocation.space_id)?.zone_id}
-                    </div>
-                  )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
 
+      {/* Previous Allocations */}
       {expiredAllocations.length > 0 && (
         <div>
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Previous Allocations</h2>
-          <div className="card">
+          <div className="card p-4 shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -121,18 +116,13 @@ const SellerSpaces = () => {
                 <tbody>
                   {expiredAllocations.map((allocation: any) => {
                     const space = spaceMap.get(allocation.space_id)
+                    const monthlyRate = Number(space?.monthly_rate || space?.daily_rate || 0).toFixed(2)
                     return (
                       <tr key={allocation.allocation_id} className="border-b border-gray-100">
                         <td className="py-3 px-4">{space?.space_number || space?.space_code || `Space #${allocation.space_id}`}</td>
-                        <td className="py-3 px-4">
-                          {format(new Date(allocation.start_date), 'MMM dd, yyyy')}
-                        </td>
-                        <td className="py-3 px-4">
-                          {allocation.end_date
-                            ? format(new Date(allocation.end_date), 'MMM dd, yyyy')
-                            : 'N/A'}
-                        </td>
-                        <td className="py-3 px-4">${(space?.monthly_rate || space?.daily_rate || 0).toFixed(2)}</td>
+                        <td className="py-3 px-4">{allocation.start_date ? format(parseISO(allocation.start_date), 'MMM dd, yyyy') : 'N/A'}</td>
+                        <td className="py-3 px-4">{allocation.end_date ? format(parseISO(allocation.end_date), 'MMM dd, yyyy') : 'N/A'}</td>
+                        <td className="py-3 px-4">${monthlyRate}</td>
                         <td className="py-3 px-4">
                           <span className={`px-2 py-1 rounded text-xs ${
                             allocation.status === 'expired' ? 'bg-gray-100 text-gray-800' :
@@ -152,6 +142,7 @@ const SellerSpaces = () => {
         </div>
       )}
 
+      {/* No allocations */}
       {activeAllocations.length === 0 && expiredAllocations.length === 0 && (
         <div className="card text-center py-12">
           <Square className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -163,5 +154,3 @@ const SellerSpaces = () => {
 }
 
 export default SellerSpaces
-
-
