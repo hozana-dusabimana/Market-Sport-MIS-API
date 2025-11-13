@@ -14,6 +14,7 @@ import spaceRoutes from './routes/space.routes.js';
 import allocationRoutes from './routes/allocation.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
+import reportRoutes from './routes/report.routes.js';
 
 const app = express();
 
@@ -64,6 +65,7 @@ app.use('/api/v1/spaces', spaceRoutes);
 app.use('/api/v1/allocations', allocationRoutes);
 app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/reports', reportRoutes);
 
 // 404 handler
 app.use((req, res) => {
