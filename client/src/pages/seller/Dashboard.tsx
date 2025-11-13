@@ -8,6 +8,7 @@ import { spaceService } from '../../services/spaceService'
 import { zoneService } from '../../services/zoneService'
 import { authService } from '../../services/authService'
 import { Square, CreditCard, Bell, DollarSign, User, AlertCircle, CheckCircle, Clock, XCircle, Link as LinkIcon, Plus } from 'lucide-react'
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { format, differenceInDays, isAfter, parseISO, addMonths, addDays } from 'date-fns'
 import { Link } from 'react-router-dom'
 import { useState, useRef } from 'react'
@@ -42,6 +43,10 @@ const SellerDashboard = () => {
     payment_date: format(new Date(), 'yyyy-MM-dd'),
     status: 'completed',
   })
+  const [paymentsSearch, setPaymentsSearch] = useState('')
+  const [paymentsStatus, setPaymentsStatus] = useState<'all' | 'completed' | 'pending' | 'failed'>('all')
+  const [notificationsSearch, setNotificationsSearch] = useState('')
+  const [notificationsType, setNotificationsType] = useState<'all' | 'payment' | 'allocation' | 'verification' | 'system'>('all')
 
   const createPaymentMutation = useMutation(
     (payment: Payment) => paymentService.create(payment),
@@ -213,11 +218,11 @@ const SellerDashboard = () => {
   const pendingPayments = payments.filter((p: any) => p.status === 'pending') || []
   const completedPayments = payments.filter((p: any) => p.status === 'completed') || []
   const unreadNotifications = notifications.filter((n: any) => n.status === 'unread' || !n.is_read) || []
-  
+
   const totalPaid = completedPayments.reduce((sum: number, p: any) => {
     return sum + (Number(p.amount) || 0)
   }, 0)
-  
+
   const pendingAmount = pendingPayments.reduce((sum: number, p: any) => {
     return sum + (Number(p.amount) || 0)
   }, 0)
@@ -234,6 +239,28 @@ const SellerDashboard = () => {
     }
     return acc
   }, {})
+
+  const monthlySeries = Object.entries(monthlyPayments)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-6)
+    .map(([, amount]: [string, any]) => Number(amount) || 0)
+  const sparkW = 160
+  const sparkH = 48
+  const maxVal = Math.max(1, ...monthlySeries)
+  const stepX = monthlySeries.length > 1 ? sparkW / (monthlySeries.length - 1) : 0
+  const points = monthlySeries.map((v, i) => {
+    const x = i * stepX
+    const y = sparkH - (v / maxVal) * sparkH
+    return `${x},${y}`
+  }).join(' ')
+
+  const monthlyChartData = Object.entries(monthlyPayments)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-6)
+    .map(([month, amount]: [string, any]) => ({
+      month: format(new Date(month + '-01'), 'MMM yy'),
+      value: Number(amount) || 0,
+    }))
 
   // Get upcoming payment due dates (for active allocations)
   const computeSuggestedAmount = (space: any, allocation: any) => {
@@ -312,7 +339,65 @@ const SellerDashboard = () => {
   ]
 
   if (userProfileLoading || allocationsLoading || paymentsLoading) {
-    return <div className="text-center py-12">Loading dashboard...</div>
+    return (
+      <div>
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <div className="h-7 w-48 bg-gray-200 rounded animate-pulse" />
+            <div className="h-4 w-64 bg-gray-100 rounded mt-2 animate-pulse" />
+          </div>
+          <div className="flex gap-2">
+            <div className="h-10 w-36 bg-gray-200 rounded animate-pulse" />
+            <div className="h-10 w-36 bg-gray-100 rounded animate-pulse" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="card">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="h-3 w-24 bg-gray-100 rounded animate-pulse" />
+                  <div className="h-6 w-20 bg-gray-200 rounded mt-3 animate-pulse" />
+                </div>
+                <div className="p-3 rounded-lg bg-gray-100 animate-pulse w-10 h-10" />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div className="lg:col-span-2 card">
+            <div className="h-5 w-48 bg-gray-200 rounded animate-pulse mb-4" />
+            <div className="space-y-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 w-40 bg-gray-100 rounded animate-pulse" />
+                      <div className="h-3 w-32 bg-gray-100 rounded animate-pulse" />
+                    </div>
+                    <div className="h-5 w-16 bg-gray-100 rounded animate-pulse" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 mt-3">
+                    <div className="h-3 w-24 bg-gray-100 rounded animate-pulse" />
+                    <div className="h-3 w-24 bg-gray-100 rounded animate-pulse" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="card">
+            <div className="h-5 w-40 bg-gray-200 rounded animate-pulse mb-4" />
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="h-4 w-full bg-gray-100 rounded animate-pulse" />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -434,6 +519,15 @@ const SellerDashboard = () => {
                 const daysRemaining = allocation.end_date 
                   ? differenceInDays(parseISO(allocation.end_date), new Date())
                   : null
+                const totalDays = allocation.end_date && allocation.start_date
+                  ? Math.max(1, differenceInDays(parseISO(allocation.end_date), parseISO(allocation.start_date)))
+                  : null
+                const elapsedDays = allocation.start_date
+                  ? Math.max(0, differenceInDays(new Date(), parseISO(allocation.start_date)))
+                  : null
+                const progress = totalDays !== null && elapsedDays !== null
+                  ? Math.min(100, Math.max(0, Math.round((elapsedDays / totalDays) * 100)))
+                  : null
                 
                 return (
                   <div key={allocation.allocation_id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
@@ -471,6 +565,14 @@ const SellerDashboard = () => {
                           <p className="font-medium text-gray-900">
                             {format(new Date(allocation.end_date), 'MMM dd, yyyy')}
                           </p>
+                          {progress !== null && (
+                            <div className="mt-2">
+                              <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden" aria-label="Allocation period progress" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
+                                <div className="h-2 bg-primary-500 rounded-full" style={{ width: `${progress}%` }} />
+                              </div>
+                              <p className="text-xs text-gray-500 mt-1">{progress}% of current period elapsed</p>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -531,16 +633,55 @@ const SellerDashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Recent Payments */}
         <div className="card">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Recent Payments</h2>
-            <Link to="/my-payments" className="text-primary-600 hover:text-primary-700 text-sm font-medium flex items-center space-x-1">
-              <span>View All</span>
-              <LinkIcon size={16} />
-            </Link>
+          <div className="flex flex-col gap-3 mb-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold text-gray-900">Recent Payments</h2>
+              <Link to="/my-payments" className="text-primary-600 hover:text-primary-700 text-sm font-medium flex items-center space-x-1">
+                <span>View All</span>
+                <LinkIcon size={16} />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <input
+                type="text"
+                value={paymentsSearch}
+                onChange={(e) => setPaymentsSearch(e.target.value)}
+                className="input"
+                placeholder="Search amount, method or date"
+                aria-label="Search payments"
+              />
+              <select
+                value={paymentsStatus}
+                onChange={(e) => setPaymentsStatus(e.target.value as any)}
+                className="input"
+                aria-label="Filter payments by status"
+              >
+                <option value="all">All statuses</option>
+                <option value="completed">Completed</option>
+                <option value="pending">Pending</option>
+                <option value="failed">Failed</option>
+              </select>
+              <div className="hidden sm:flex items-center justify-end">
+                <svg width={sparkW} height={sparkH} viewBox={`0 0 ${sparkW} ${sparkH}`} aria-label="Payments trend">
+                  <polyline fill="none" stroke="#3b82f6" strokeWidth="2" points={points} />
+                </svg>
+              </div>
+            </div>
           </div>
           {payments.length > 0 ? (
             <div className="space-y-3">
-              {payments.slice(0, 5).map((payment: any) => (
+              {payments
+                .filter((p: any) => {
+                  const q = paymentsSearch.toLowerCase()
+                  const matchesText = !q ||
+                    String(p.amount).toLowerCase().includes(q) ||
+                    (p.payment_method || '').toLowerCase().includes(q) ||
+                    (p.payment_date ? format(new Date(p.payment_date), 'MMM dd, yyyy').toLowerCase().includes(q) : false)
+                  const matchesStatus = paymentsStatus === 'all' || p.status === paymentsStatus
+                  return matchesText && matchesStatus
+                })
+                .slice(0, 5)
+                .map((payment: any) => (
                 <div key={payment.payment_id} className="border-b border-gray-200 pb-3 last:border-0">
                   <div className="flex justify-between items-center">
                     <div className="flex-1">
@@ -569,23 +710,64 @@ const SellerDashboard = () => {
           ) : (
             <div className="text-center py-8">
               <CreditCard className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-              <p className="text-gray-500">No payment history</p>
+              <p className="text-gray-500">No payment history yet</p>
+              <button
+                className="btn btn-primary mt-3"
+                onClick={() => setIsPaymentModalOpen(true)}
+              >
+                Make your first payment
+              </button>
             </div>
           )}
         </div>
 
         {/* Recent Notifications */}
         <div className="card">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Recent Notifications</h2>
-            <Link to="/my-notifications" className="text-primary-600 hover:text-primary-700 text-sm font-medium flex items-center space-x-1">
-              <span>View All</span>
-              <LinkIcon size={16} />
-            </Link>
+          <div className="flex flex-col gap-3 mb-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold text-gray-900">Recent Notifications</h2>
+              <Link to="/my-notifications" className="text-primary-600 hover:text-primary-700 text-sm font-medium flex items-center space-x-1">
+                <span>View All</span>
+                <LinkIcon size={16} />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <input
+                type="text"
+                value={notificationsSearch}
+                onChange={(e) => setNotificationsSearch(e.target.value)}
+                className="input"
+                placeholder="Search title or message"
+                aria-label="Search notifications"
+              />
+              <select
+                value={notificationsType}
+                onChange={(e) => setNotificationsType(e.target.value as any)}
+                className="input"
+                aria-label="Filter notifications by type"
+              >
+                <option value="all">All types</option>
+                <option value="payment">Payment</option>
+                <option value="allocation">Allocation</option>
+                <option value="verification">Verification</option>
+                <option value="system">System</option>
+              </select>
+            </div>
           </div>
           {notifications.length > 0 ? (
             <div className="space-y-3">
-              {notifications.slice(0, 5).map((notification: any) => {
+              {notifications
+                .filter((n: any) => {
+                  const q = notificationsSearch.toLowerCase()
+                  const matchesText = !q ||
+                    (n.title || '').toLowerCase().includes(q) ||
+                    (n.message || '').toLowerCase().includes(q)
+                  const type = (n.notification_type || 'system').toLowerCase()
+                  const matchesType = notificationsType === 'all' || type === notificationsType
+                  return matchesText && matchesType
+                })
+                .slice(0, 5)
+                .map((notification: any) => {
                 const isUnread = notification.status === 'unread' || !notification.is_read
                 return (
                   <div
@@ -612,7 +794,10 @@ const SellerDashboard = () => {
           ) : (
             <div className="text-center py-8">
               <Bell className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-              <p className="text-gray-500">No notifications</p>
+              <p className="text-gray-500">No notifications yet</p>
+              <Link to="/profile" className="btn btn-secondary mt-3">
+                Check your profile settings
+              </Link>
             </div>
           )}
         </div>
@@ -703,7 +888,24 @@ const SellerDashboard = () => {
           {Object.keys(monthlyPayments).length > 0 && (
             <div className="card">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Monthly Payment History</h2>
-              <div className="space-y-2">
+              <div className="w-full" style={{ height: 240 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={monthlyChartData} margin={{ top: 10, right: 16, bottom: 0, left: 0 }}>
+                    <defs>
+                      <linearGradient id="colorPay" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.35} />
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.05} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="month" tick={{ fill: '#6b7280', fontSize: 12 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} axisLine={false} tickLine={false} width={40} />
+                    <Tooltip formatter={(v: any) => [`$${Number(v).toFixed(2)}`, 'Total']} labelClassName="text-gray-700" />
+                    <Area type="monotone" dataKey="value" stroke="#3b82f6" fill="url(#colorPay)" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="space-y-2 mt-4">
                 {Object.entries(monthlyPayments)
                   .sort(([a], [b]) => b.localeCompare(a))
                   .slice(0, 6)
@@ -723,15 +925,15 @@ const SellerDashboard = () => {
       <div className="card">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Link to="/my-spaces" className="flex flex-col items-center justify-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+          <Link to="/my-spaces" aria-label="Go to My Spaces" className="relative flex flex-col items-center justify-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
             <Square className="w-8 h-8 text-primary-600 mb-2" />
             <span className="text-sm font-medium text-gray-900">My Spaces</span>
           </Link>
-          <Link to="/my-payments" className="flex flex-col items-center justify-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+          <Link to="/my-payments" aria-label="Go to Payments" className="relative flex flex-col items-center justify-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
             <CreditCard className="w-8 h-8 text-primary-600 mb-2" />
             <span className="text-sm font-medium text-gray-900">Payments</span>
           </Link>
-          <Link to="/my-notifications" className="flex flex-col items-center justify-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+          <Link to="/my-notifications" aria-label="Go to Notifications" className="relative flex flex-col items-center justify-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
             <Bell className="w-8 h-8 text-primary-600 mb-2" />
             <span className="text-sm font-medium text-gray-900">Notifications</span>
             {unreadNotifications.length > 0 && (
@@ -740,7 +942,7 @@ const SellerDashboard = () => {
               </span>
             )}
           </Link>
-          <Link to="/profile" className="flex flex-col items-center justify-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+          <Link to="/profile" aria-label="Go to Profile" className="relative flex flex-col items-center justify-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
             <User className="w-8 h-8 text-primary-600 mb-2" />
             <span className="text-sm font-medium text-gray-900">Profile</span>
           </Link>
@@ -895,11 +1097,11 @@ const SellerDashboard = () => {
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => setIsPaymentModalOpen(false)} className="btn btn-outline">
+                <button type="button" aria-label="Cancel payment" onClick={() => setIsPaymentModalOpen(false)} className="btn btn-outline">
                   Cancel
                 </button>
-                <button type="submit" disabled={createPaymentMutation.isLoading} className="btn btn-primary">
-                  {createPaymentMutation.isLoading ? 'Processing...' : 'Pay Now'}
+                <button type="submit" aria-label="Submit payment" disabled={createPaymentMutation.isLoading || lanariMutation.isLoading} className="btn btn-primary">
+                  {createPaymentMutation.isLoading || lanariMutation.isLoading ? 'Processing...' : 'Pay Now'}
                 </button>
               </div>
             </form>

@@ -47,6 +47,7 @@ const Sidebar = () => {
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/zones', label: 'Zones', icon: MapPin },
     { path: '/spaces', label: 'Spaces', icon: Square },
+    { path: '/sellers', label: 'Sellers', icon: Users },
     { path: '/allocations', label: 'Allocations', icon: ShoppingBag },
     { path: '/payments', label: 'Payments', icon: CreditCard },
     { path: '/reports', label: 'Reports', icon: FileText },
