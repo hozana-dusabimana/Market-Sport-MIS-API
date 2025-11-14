@@ -1,6 +1,7 @@
 import db from '../config/database.js';
 import { Allocation } from '../models/Payment.model.js';
 import Space from '../models/Space.model.js';
+import NotificationService from '../services/notificationService.js';
 
 class AllocationController {
   // Get all allocations with filters
@@ -130,6 +131,13 @@ class AllocationController {
         status: 'active'
       });
 
+      // Auto-create notification
+      await NotificationService.createAllocationNotification({
+        allocation_id: allocationId,
+        seller_id,
+        space_id
+      }, approvedBy);
+
       res.status(201).json({
         success: true,
         message: 'Allocation created successfully',
@@ -164,6 +172,9 @@ class AllocationController {
         return res.status(500).json({ success: false, message: 'Failed to update allocation' });
       }
 
+      // Auto-create notification
+      await NotificationService.updateAllocationNotification(id, updates, req.user?.user_id);
+
       res.json({ success: true, message: 'Allocation updated successfully' });
     } catch (error) {
       console.error('Update allocation error:', error);
@@ -195,6 +206,9 @@ class AllocationController {
       if (!updated) {
         return res.status(404).json({ success: false, message: 'Allocation not found' });
       }
+
+      // Auto-create notification
+      await NotificationService.updateAllocationNotification(id, { status }, req.user?.user_id);
 
       res.json({ success: true, message: 'Allocation status updated successfully' });
     } catch (error) {

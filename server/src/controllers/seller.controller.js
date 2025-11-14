@@ -1,5 +1,6 @@
 import db from '../config/database.js';
-import Seller from '../models/Seller.model.js'; // Adjust path as needed
+import Seller from '../models/Seller.model.js';
+import NotificationService from '../services/notificationService.js';
 
 class SellerController {
   // Get all sellers with filters and pagination
@@ -214,6 +215,12 @@ class SellerController {
 
       await connection.commit();
 
+      // Auto-create notification
+      await NotificationService.createSellerNotification({
+        seller_id: sellerId,
+        user_id: finalUserId
+      }, req.user?.user_id);
+
       res.status(201).json({
         success: true,
         message: 'Seller created successfully',
@@ -313,6 +320,11 @@ class SellerController {
 
       await connection.commit();
 
+      // Auto-create notification if there were changes
+      if (updated) {
+        await NotificationService.updateSellerNotification(sellerId, { ...userUpdate, ...sellerUpdate }, req.user?.user_id);
+      }
+
       res.json({
         success: true,
         message: updated ? 'Seller updated successfully' : 'No changes made'
@@ -368,6 +380,9 @@ class SellerController {
         // Non-fatal: log and continue
         console.warn('Failed to sync user status for seller', id, e?.message);
       }
+
+      // Auto-create notification
+      await NotificationService.updateSellerNotification(id, { verification_status: status }, req.user?.user_id);
 
       res.json({ success: true, message: `Verification status updated to ${status}` });
     } catch (error) {

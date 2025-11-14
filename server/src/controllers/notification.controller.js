@@ -100,64 +100,12 @@ class NotificationController {
     }
   }
 
-  // Create notification
+  // Notifications are now created automatically - manual creation disabled
   async createNotification(req, res) {
-    try {
-      const {
-        user_id,
-        seller_id,
-        title,
-        message,
-        notification_type,
-        related_id,
-        action_url
-      } = req.body;
-
-      if (!user_id || !title || !message) {
-        return res.status(400).json({
-          success: false,
-          message: 'User ID, title, and message are required'
-        });
-      }
-
-      // For managers: can only create notifications for their own sellers, and only address self when not tied to a seller
-      if (req.user?.user_type === 'manager') {
-        const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
-        const currentUserId = req.user?.user_id || req.user?.id;
-        if (!managerId) {
-          return res.status(403).json({ success: false, message: 'Forbidden: manager id missing' });
-        }
-        if (seller_id) {
-          const [rows] = await db.query('SELECT manager_id FROM sellers WHERE seller_id = ? LIMIT 1', [seller_id]);
-          const sellerManagerId = rows?.[0]?.manager_id;
-          if (!sellerManagerId || sellerManagerId !== managerId) {
-            return res.status(403).json({ success: false, message: 'Forbidden: cannot notify another manager\'s seller' });
-          }
-        } else if (user_id !== currentUserId) {
-          return res.status(403).json({ success: false, message: 'Forbidden: managers can only create self-addressed notifications when not tied to a seller' });
-        }
-      }
-
-      const notificationId = await Notification.create({
-        user_id,
-        seller_id,
-        title,
-        message,
-        notification_type: notification_type || 'system',
-        related_id,
-        action_url,
-        status: 'unread'
-      });
-
-      res.status(201).json({
-        success: true,
-        message: 'Notification created successfully',
-        data: { notification_id: notificationId }
-      });
-    } catch (error) {
-      console.error('Create notification error:', error);
-      res.status(500).json({ success: false, message: 'Failed to create notification', error: error.message });
-    }
+    return res.status(405).json({
+      success: false,
+      message: 'Manual notification creation is disabled. Notifications are created automatically based on system events.'
+    });
   }
 
   // Update notification

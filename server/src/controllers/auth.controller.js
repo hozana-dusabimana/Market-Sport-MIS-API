@@ -4,6 +4,7 @@ import db from '../config/database.js';
 import config from '../config/config.js';
 import User from '../models/User.model.js';
 import Blacklist from '../models/Blacklist.model.js';
+import NotificationService from '../services/notificationService.js';
 
 class AuthController {
   // Register new user
@@ -125,6 +126,13 @@ class AuthController {
       }
 
       await connection.commit();
+
+      // Auto-create notification
+      await NotificationService.createUserNotification({
+        user_id: userId,
+        username,
+        user_type
+      }, null);
 
       const token = jwt.sign(
         { userId, username, user_type },
