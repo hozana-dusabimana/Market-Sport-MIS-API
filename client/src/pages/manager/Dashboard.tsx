@@ -35,11 +35,18 @@ const ManagerDashboard = () => {
   // --- State ---
   const [showCreateModal, setShowCreateModal] = useState(false)
 
+  // --- Manager scope (must be defined before queries below) ---
+  const isManager = user?.user_type === 'manager'
+  const managedZoneIds = isManager && user?.profile?.assigned_zones ? user.profile.assigned_zones : []
+  const managerIdRaw = (user as any)?.profile?.manager_id || (user as any)?.profile?.id || (user as any)?.manager_id || null
+  const managerId = managerIdRaw != null ? Number(managerIdRaw) : null
+  const username = (user as any)?.username || null
+
   // --- Queries ---
-  const { data: zonesData } = useQuery('zones', () => zoneService.getAll(), { retry: false, onError: () => {} })
+  const { data: zonesData } = useQuery(['zones', managerId], () => zoneService.getAll(isManager && managerId ? { manager_id: managerId } : undefined), { retry: false, onError: () => {} })
   const { data: spacesData } = useQuery('spaces', () => spaceService.getAll(), { retry: false, onError: () => {} })
   const { data: allocationsData } = useQuery('allocations', () => allocationService.getAll(), { retry: false, onError: () => {} })
-  const { data: sellersData } = useQuery('sellers', () => sellerService.getAll(), { retry: false, onError: () => {} })
+  const { data: sellersData } = useQuery(['sellers', managerId], () => sellerService.getAll(managerId ? { manager_id: managerId } : undefined), { retry: false, onError: () => {} })
 
   const zones = zonesData?.data || []
   const spaces = spacesData?.data || []
@@ -47,29 +54,68 @@ const ManagerDashboard = () => {
   const sellers = sellersData?.data?.sellers || sellersData?.data || []
 
   // --- Filter by manager ---
-  const managedZoneIds = user?.user_type === 'manager' && user?.profile?.assigned_zones
-    ? user.profile.assigned_zones
-    : []
 
-  const managedZones = managedZoneIds.length > 0
-    ? zones.filter((z: any) => managedZoneIds.includes(z.zone_id))
+  const assignedIds: number[] = Array.isArray(managedZoneIds) ? managedZoneIds.map((id: any) => Number(id)) : []
+  const managedZones = isManager
+    ? zones.filter((z: any) => {
+        const zid = Number(z.zone_id)
+        const zManagerId = Number((z as any).manager_id)
+        const zManagerUsername = (z as any).manager_username
+        return assignedIds.includes(zid) || (managerId != null && zManagerId === managerId) || (!!username && zManagerUsername === username)
+      })
     : zones
 
-  const managedSpaces = managedZoneIds.length > 0
-    ? spaces.filter((s: any) => managedZoneIds.includes(s.zone_id))
+  const managedSpaces = isManager
+    ? spaces.filter((s: any) => (managedZoneIds.includes(s.zone_id)) || ((s as any).manager_id === managerId))
     : spaces
 
   const managedSpaceIds = managedSpaces.map((s: any) => s.space_id)
-  const managedAllocations = managedZoneIds.length > 0
-    ? allocations.filter((a: any) => managedSpaceIds.includes(a.space_id))
+  const managedAllocations = isManager
+    ? allocations.filter((a: any) => managedSpaceIds.includes(a.space_id) || (managerId && a.manager_id === managerId))
     : allocations
 
   // Filter sellers by managed zones (sellers who have allocations in managed zones)
   const managedSellerIds = new Set(
     managedAllocations.map((a: any) => a.seller_id).filter(Boolean)
   )
-  const managedSellers = managedZoneIds.length > 0
-    ? sellers.filter((s: any) => managedSellerIds.has(s.seller_id) || managedSellerIds.has(s.user_id))
+
+  // --- Seller actions ---
+  const verifySellerMutation = useMutation(
+    async (sellerId: number) => sellerService.updateVerificationStatus(sellerId, 'verified'),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('sellers')
+        toast.success('Seller verified')
+      },
+      onError: (error: any) => {
+        toast.error(error.response?.data?.message || 'Failed to verify seller')
+      },
+    }
+  )
+
+  const rejectSellerMutation = useMutation(
+    async (sellerId: number) => sellerService.updateVerificationStatus(sellerId, 'rejected'),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('sellers')
+        toast.success('Seller rejected')
+      },
+      onError: (error: any) => {
+        toast.error(error.response?.data?.message || 'Failed to reject seller')
+      },
+    }
+  )
+
+  const handleVerify = (sellerId: number) => verifySellerMutation.mutate(sellerId)
+  const handleReject = (sellerId: number) => rejectSellerMutation.mutate(sellerId)
+  const managedSellers = isManager
+    ? sellers.filter((s: any) => {
+        const createdBy = Number((s as any).created_by_manager_id)
+        const ownsByCreator = managerId != null && createdBy === managerId
+        const ownsByAlloc = managedSellerIds.has(s.seller_id) || managedSellerIds.has(s.user_id)
+        const ownsByManagerIdColumn = managerId != null && Number((s as any).manager_id) === managerId
+        return ownsByCreator || ownsByAlloc || ownsByManagerIdColumn
+      })
     : sellers
 
   // --- Stats ---
@@ -100,6 +146,7 @@ const ManagerDashboard = () => {
         ...data,
         user_type: 'seller',
         registration_date: new Date().toISOString().split('T')[0],
+        manager_id: (user as any)?.profile?.manager_id || (user as any)?.manager_id || undefined,
       }
       return await authService.register(registerData)
     },
@@ -136,8 +183,8 @@ const ManagerDashboard = () => {
 
       {/* Seller Registration Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[95vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 fade-in">
+          <div className="bg-white rounded-xl p-6 w-full max-w-3xl max-h-[95vh] overflow-y-auto slide-up">
             <div className="flex justify-between items-center mb-6">
               <div>
                 <div className="inline-flex items-center justify-center w-12 h-12 bg-primary-100 rounded-full mb-3">
@@ -347,27 +394,64 @@ const ManagerDashboard = () => {
       {/* Sellers Section */}
       {managedSellers && managedSellers.length > 0 && (
         <div className="card mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Managed Sellers</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {managedSellers.map((seller: any) => (
-              <div key={seller.seller_id || seller.user_id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900">{seller.business_name || seller.full_name || seller.user?.username || 'N/A'}</h3>
-                    <p className="text-xs text-gray-600">{seller.business_type || 'N/A'}</p>
-                  </div>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    seller.status === 'active' || seller.verification_status === 'verified' 
-                      ? 'bg-green-100 text-green-800' 
-                      : seller.status === 'inactive' 
-                      ? 'bg-gray-100 text-gray-800' 
-                      : 'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {seller.status || seller.verification_status || 'pending'}
-                  </span>
-                </div>
-              </div>
-            ))}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">Managed Sellers</h2>
+            <span className="text-sm text-gray-600">Total: {managedSellers.length}</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="text-left text-gray-600 border-b">
+                  <th className="py-2 pr-4">Name</th>
+                  <th className="py-2 pr-4">Business</th>
+                  <th className="py-2 pr-4">Phone</th>
+                  <th className="py-2 pr-4">Status</th>
+                  <th className="py-2 pr-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {managedSellers.map((s: any) => (
+                  <tr key={s.seller_id || s.user_id} className="border-b hover:bg-gray-50">
+                    <td className="py-2 pr-4">{s.full_name || s.username || 'N/A'}</td>
+                    <td className="py-2 pr-4">{s.business_name || '—'}</td>
+                    <td className="py-2 pr-4">{s.phone_number || s.user?.phone_number || '—'}</td>
+                    <td className="py-2 pr-4">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        s.verification_status === 'verified' || s.status === 'active'
+                          ? 'bg-green-100 text-green-800'
+                          : s.verification_status === 'rejected' || s.status === 'inactive'
+                          ? 'bg-gray-100 text-gray-800'
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {s.verification_status || s.status || 'pending'}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-4 space-x-2">
+                      <button
+                        className="btn btn-xs btn-primary"
+                        onClick={() => handleVerify(s.seller_id)}
+                        disabled={verifySellerMutation.isLoading}
+                      >
+                        Verify
+                      </button>
+                      <button
+                        className="btn btn-xs btn-secondary"
+                        onClick={() => handleReject(s.seller_id)}
+                        disabled={rejectSellerMutation.isLoading}
+                      >
+                        Reject
+                      </button>
+                      <button
+                        className="btn btn-xs"
+                        onClick={() => window.location.assign(`/admin/sellers/${s.seller_id || s.user_id}`)}
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

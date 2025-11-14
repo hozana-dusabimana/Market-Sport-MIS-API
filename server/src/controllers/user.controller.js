@@ -10,9 +10,18 @@ async getAllUsers(req, res) {
   try {
     const { id } = req.query; // Extract id from query params
 
+    // RBAC: Managers cannot list users; only allowed to fetch themselves via ?id=me or their own numeric id
+    if (req.user?.user_type === 'manager') {
+      const selfId = req.user?.user_id || req.user?.id;
+      if (!id || (id !== 'me' && String(id) !== String(selfId))) {
+        return res.status(403).json({ success: false, message: 'Forbidden: managers cannot list users' });
+      }
+    }
+
     if (id) {
       // If id is provided, fetch single user (treat as single-item list)
-      const user = await User.findWithProfile(id);
+      const resolvedId = id === 'me' ? (req.user?.user_id || req.user?.id) : id;
+      const user = await User.findWithProfile(resolvedId);
 
       if (!user) {
         return res.status(404).json({ success: false, message: 'User not found' });
@@ -31,6 +40,11 @@ async getAllUsers(req, res) {
           }
         }
       });
+    }
+
+    // Admin-only beyond this point
+    if (req.user?.user_type !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Forbidden: admin only' });
     }
 
     // Original list logic for no id or other filters
@@ -67,6 +81,13 @@ async getAllUsers(req, res) {
   async getUserById(req, res) {
     try {
       const { id } = req.params;
+      // RBAC: Managers can only access their own record
+      if (req.user?.user_type === 'manager') {
+        const selfId = req.user?.user_id || req.user?.id;
+        if (String(id) !== String(selfId)) {
+          return res.status(403).json({ success: false, message: 'Forbidden: managers can only access their own profile' });
+        }
+      }
       const user = await User.findWithProfile(id);
 
       if (!user) {
@@ -89,6 +110,12 @@ async getAllUsers(req, res) {
     
     try {
       await connection.beginTransaction();
+
+      // Admin-only
+      if (req.user?.user_type !== 'admin') {
+        await connection.rollback();
+        return res.status(403).json({ success: false, message: 'Forbidden: admin only' });
+      }
 
       const {
         username,
@@ -172,8 +199,10 @@ async getAllUsers(req, res) {
         case 'seller':
           const [sellerResult] = await connection.query(
             `INSERT INTO sellers (user_id, full_name, id_number, business_name, business_type, tin_number, emergency_contact, address, registration_date, verification_status) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
-            [userId, full_name || null, id_number, business_name || null, business_type || null, tin_number || null, emergency_contact || null, address || null, registration_date || new Date().toISOString().split('T')[0]]
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, full_name || null, id_number, business_name || null, business_type || null, tin_number || null, emergency_contact || null, address || null, registration_date || new Date().toISOString().split('T')[0],
+              'pending'
+            ]
           );
           profileId = sellerResult.insertId;
           break;
@@ -195,6 +224,7 @@ async getAllUsers(req, res) {
       connection.release();
     }
   }
+
 // Update user (general updates to users table and profile)
 async updateUser(req, res) {
   const connection = await db.getConnection();
@@ -210,6 +240,15 @@ async updateUser(req, res) {
     if (!user) {
       await connection.rollback();
       return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // RBAC: Managers can only update their own account
+    if (req.user?.user_type === 'manager') {
+      const selfId = req.user?.user_id || req.user?.id;
+      if (String(userId) !== String(selfId)) {
+        await connection.rollback();
+        return res.status(403).json({ success: false, message: 'Forbidden: managers can only update their own profile' });
+      }
     }
 
     const user_type = user.user_type;
@@ -361,6 +400,10 @@ async updateUser(req, res) {
   // Update user status (suspend, activate, etc.)
   async updateStatus(req, res) {
     try {
+      // Admin-only
+      if (req.user?.user_type !== 'admin') {
+        return res.status(403).json({ success: false, message: 'Forbidden: admin only' });
+      }
       const { id } = req.params;
       const { status } = req.body;
 
@@ -384,6 +427,10 @@ async updateUser(req, res) {
   // Delete user
   async deleteUser(req, res) {
     try {
+      // Admin-only
+      if (req.user?.user_type !== 'admin') {
+        return res.status(403).json({ success: false, message: 'Forbidden: admin only' });
+      }
       const { id } = req.params;
 
       // Optionally, soft delete by setting status to 'deleted', but here using hard delete as per model
@@ -403,6 +450,10 @@ async updateUser(req, res) {
   // Get user statistics by type
   async getStatistics(req, res) {
     try {
+      // Admin-only
+      if (req.user?.user_type !== 'admin') {
+        return res.status(403).json({ success: false, message: 'Forbidden: admin only' });
+      }
       const stats = await User.getStatistics();
 
       res.json({
@@ -418,6 +469,10 @@ async updateUser(req, res) {
   // Get count by user type
   async getCountByType(req, res) {
     try {
+      // Admin-only
+      if (req.user?.user_type !== 'admin') {
+        return res.status(403).json({ success: false, message: 'Forbidden: admin only' });
+      }
       const { user_type } = req.params;
 
       if (!['admin', 'manager', 'seller'].includes(user_type)) {

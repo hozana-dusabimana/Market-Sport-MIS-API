@@ -27,6 +27,7 @@ const ManagerAllocations = () => {
 
   const queryClient = useQueryClient()
   const managedZoneIds = user?.profile?.assigned_zones || []
+  const managerId = (user as any)?.profile?.manager_id || (user as any)?.profile?.id || (user as any)?.manager_id || null
 
   const { data: allocationsData, isLoading } = useQuery(
     ['allocations', statusFilter, sellerFilter, managedZoneIds],
@@ -47,8 +48,8 @@ const ManagerAllocations = () => {
   )
   
   const { data: sellersData } = useQuery(
-    ['sellers-list', managedZoneIds],
-    () => sellerService.getAll(),
+    ['sellers-list', managedZoneIds, managerId],
+    () => sellerService.getAll(managerId ? { manager_id: managerId } : undefined),
     {
       retry: false,
       onError: () => {},
@@ -64,10 +65,14 @@ const ManagerAllocations = () => {
     ? allSpaces.filter((s: any) => managedZoneIds.includes(s.zone_id))
     : allSpaces
   const managedSpaceIds = managedSpaces.map((s: any) => s.space_id)
+  // Union: in assigned zones OR created by this manager
   const allocations = managedZoneIds.length > 0
-    ? allAllocations.filter((a: Allocation) => managedSpaceIds.includes(a.space_id))
+    ? allAllocations.filter((a: any) => managedSpaceIds.includes(a.space_id) || (managerId && a.manager_id === managerId))
     : allAllocations
   const spaces = managedZoneIds.length > 0 ? managedSpaces : allSpaces
+
+  // Derive managed sellers from the filtered allocations
+  const managedSellerIds = Array.from(new Set((allocations as any[]).map(a => a.seller_id)))
 
   const { data: allocationDetails } = useQuery(
     ['allocation-details', selectedAllocation?.allocation_id],
@@ -128,7 +133,9 @@ const ManagerAllocations = () => {
         toast.success('Allocation status updated successfully')
       },
       onError: (error: any) => {
-        toast.error(error.response?.data?.message || 'Failed to update allocation status')
+        if (error?.response?.status !== 403) {
+          toast.error(error.response?.data?.message || 'Failed to update allocation status')
+        }
       },
     }
   )
@@ -142,7 +149,9 @@ const ManagerAllocations = () => {
         toast.success('Allocation terminated successfully')
       },
       onError: (error: any) => {
-        toast.error(error.response?.data?.message || 'Failed to terminate allocation')
+        if (error?.response?.status !== 403) {
+          toast.error(error.response?.data?.message || 'Failed to terminate allocation')
+        }
       },
     }
   )
@@ -153,7 +162,9 @@ const ManagerAllocations = () => {
       toast.success('Allocation deleted successfully')
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to delete allocation')
+      if (error?.response?.status !== 403) {
+        toast.error(error.response?.data?.message || 'Failed to delete allocation')
+      }
     },
   })
 
@@ -250,7 +261,9 @@ const ManagerAllocations = () => {
             className="input"
           >
             <option value="all">All Sellers</option>
-            {sellers.map((seller: any) => (
+            {sellers
+              .filter((seller: any) => managedZoneIds.length === 0 || managedSellerIds.includes(seller.seller_id || seller.user_id) || (managerId && seller.manager_id === managerId))
+              .map((seller: any) => (
               <option key={seller.seller_id || seller.user_id} value={seller.seller_id || seller.user_id}>
                 {seller.business_name || seller.full_name || seller.user?.username || 'N/A'}
               </option>
@@ -262,7 +275,7 @@ const ManagerAllocations = () => {
       {/* Allocations Table */}
       <div className="card">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="table">
             <thead>
               <tr className="border-b border-gray-200">
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Seller</th>
@@ -279,6 +292,7 @@ const ManagerAllocations = () => {
                 allocations.map((allocation: Allocation) => {
                   const seller = sellers.find((s: any) => (s.seller_id || s.user_id) === allocation.seller_id)
                   const space = spaces.find((s: any) => s.space_id === allocation.space_id)
+                  const owned = managerId && (allocation as any).manager_id === managerId
                   return (
                     <tr key={allocation.allocation_id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-3 px-4">
@@ -295,29 +309,43 @@ const ManagerAllocations = () => {
                       </td>
                       <td className="py-3 px-4 capitalize">{allocation.allocation_type || 'N/A'}</td>
                       <td className="py-3 px-4">
-                        <select
-                          value={allocation.status}
-                          onChange={(e) => {
-                            if (window.confirm(`Change allocation status to ${e.target.value}?`)) {
-                              updateStatusMutation.mutate({ id: allocation.allocation_id!, status: e.target.value })
-                            }
-                          }}
-                          className={`px-2 py-1 rounded text-xs font-medium border-0 ${
-                            allocation.status === 'active'
-                              ? 'bg-green-100 text-green-800'
-                              : allocation.status === 'expired'
-                              ? 'bg-gray-100 text-gray-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}
-                        >
-                          <option value="active">Active</option>
-                          <option value="expired">Expired</option>
-                          <option value="terminated">Terminated</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
+                        {owned ? (
+                          <select
+                            value={allocation.status}
+                            onChange={(e) => {
+                              if (window.confirm(`Change allocation status to ${e.target.value}?`)) {
+                                updateStatusMutation.mutate({ id: allocation.allocation_id!, status: e.target.value })
+                              }
+                            }}
+                            className={`px-2 py-1 rounded text-xs font-medium border-0 ${
+                              allocation.status === 'active'
+                                ? 'bg-green-100 text-green-800'
+                                : allocation.status === 'expired'
+                                ? 'bg-gray-100 text-gray-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}
+                          >
+                            <option value="active">Active</option>
+                            <option value="expired">Expired</option>
+                            <option value="terminated">Terminated</option>
+                            <option value="cancelled">Cancelled</option>
+                          </select>
+                        ) : (
+                          <span
+                            className={`px-2 py-1 rounded text-xs font-medium ${
+                              allocation.status === 'active'
+                                ? 'bg-green-100 text-green-800'
+                                : allocation.status === 'expired'
+                                ? 'bg-gray-100 text-gray-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}
+                          >
+                            {allocation.status}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-4">
-                        {allocation.status === 'active' && (
+                        {owned && allocation.status === 'active' && (
                           <button
                             onClick={() => handleTerminate(allocation.allocation_id!)}
                             className="text-red-600 hover:text-red-700"
@@ -326,15 +354,13 @@ const ManagerAllocations = () => {
                             <X size={18} />
                           </button>
                         )}
-                        {allocation.status !== 'active' && (
-                          <button
-                            onClick={() => handleViewDetails(allocation)}
-                            className="text-primary-600 hover:text-primary-700"
-                            title="View Details"
-                          >
-                            <Eye size={18} />
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleViewDetails(allocation)}
+                          className="text-primary-600 hover:text-primary-700"
+                          title="View Details"
+                        >
+                          <Eye size={18} />
+                        </button>
                       </td>
                     </tr>
                   )
@@ -353,8 +379,8 @@ const ManagerAllocations = () => {
 
       {/* Create Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 fade-in">
+          <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto slide-up">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Create Allocation</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -367,7 +393,9 @@ const ManagerAllocations = () => {
                     required
                   >
                     <option value={0}>Select Seller</option>
-                    {sellers.map((seller: any) => (
+                    {sellers
+                      .filter((s: any) => managedZoneIds.length === 0 || managedSellerIds.includes(s.seller_id || s.user_id) || (managerId && s.manager_id === managerId))
+                      .map((seller: any) => (
                       <option key={seller.seller_id || seller.user_id} value={seller.seller_id || seller.user_id}>
                         {seller.business_name || seller.full_name || seller.user?.username || 'N/A'}
                       </option>
@@ -455,8 +483,8 @@ const ManagerAllocations = () => {
 
       {/* Details Modal */}
       {showDetails && allocationDetailsData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 fade-in">
+          <div className="bg-white rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto slide-up">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold text-gray-900">Allocation Details</h2>
               <button

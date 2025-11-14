@@ -4,20 +4,19 @@ import { paymentService } from '../../services/paymentService'
 import { sellerService } from '../../services/sellerService'
 import { Download, CreditCard, Calendar } from 'lucide-react'
 import { format } from 'date-fns'
+import { authService } from '../../services/authService'
 
 const SellerPayments = () => {
   const { user } = useAuthStore()
   const userId = user?.userId
 
-  // Fetch seller profile
-  const { data: sellerProfileResponse, isLoading: profileLoading } = useQuery(
-    ['seller-profile', userId],
-    () => sellerService.getAll({ id: userId }),
-    { enabled: !!userId && user?.user_type === 'seller', retry: false, onError: () => {} }
+  // Fetch user profile to derive seller_id
+  const { data: userProfileData, isLoading: userProfileLoading } = useQuery(
+    ['user-profile', userId],
+    () => authService.getProfile(),
+    { enabled: !!userId, retry: false, onError: () => {} }
   )
-
-  const sellerProfile = sellerProfileResponse?.data?.sellers?.[0] || sellerProfileResponse?.data
-  const sellerId = sellerProfile?.seller_id || sellerProfile?.user_id || userId
+  const sellerId = userProfileData?.data?.profile?.seller_id || userProfileData?.data?.user_id || userId
 
   // Fetch payments
   const { data: paymentsData, isLoading: paymentsLoading } = useQuery(
@@ -28,7 +27,7 @@ const SellerPayments = () => {
 
   const payments = paymentsData?.data || []
 
-  if (profileLoading || paymentsLoading) {
+  if (userProfileLoading || paymentsLoading) {
     return <div className="text-center py-12">Loading payments...</div>
   }
 

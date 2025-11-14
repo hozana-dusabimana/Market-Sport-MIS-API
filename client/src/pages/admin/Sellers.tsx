@@ -1,341 +1,296 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from 'react-query'
-import { sellerService, Seller } from '../../services/sellerService'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+// Mock imports for independent execution
+ import { authService, RegisterData } from '../../services/authService'
 import toast from 'react-hot-toast'
-import { Search, CheckCircle, XCircle, Clock, Eye, UserCheck, UserX } from 'lucide-react'
-import { format } from 'date-fns'
-import { Link } from 'react-router-dom'
+import { UserPlus, Loader2 } from 'lucide-react'
 
-const Sellers = () => {
-  const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [selectedSeller, setSelectedSeller] = useState<Seller | null>(null)
-  const [showDetails, setShowDetails] = useState(false)
-  const [sellerStats, setSellerStats] = useState<any>(null)
-  const [sellerAllocations, setSellerAllocations] = useState<any[]>([])
-  const [sellerPayments, setSellerPayments] = useState<any[]>([])
+// --- Mock Services and Types (For runnable demonstration) ---
+interface RegisterData {
+    username: string;
+    email: string;
+    password?: string;
+    phone_number: string;
+    full_name: string;
+    id_number: string;
+    user_type: 'seller';
+    registration_date: string;
+    business_name?: string;
+    business_type?: string;
+    tin_number?: string;
+    emergency_contact?: string;
+    address?: string;
+}
 
-  const queryClient = useQueryClient()
 
-  const { data, isLoading } = useQuery(
-    ['sellers', statusFilter, searchTerm],
-    () =>
-      sellerService.getAll({
-        verification_status: statusFilter !== 'all' ? statusFilter : undefined,
-        search: searchTerm || undefined,
-      })
-  )
 
-  const sellers = data?.data?.sellers || data?.data || []
+// -----------------------------------------------------------
 
-  const verifyMutation = useMutation(
-    ({ id, status }: { id: number; status: 'verified' | 'rejected' }) =>
-      sellerService.updateVerificationStatus(id, status),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('sellers')
-        toast.success('Verification status updated successfully')
-      },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.message || 'Failed to update verification status')
-      },
+const sellerSchema = z.object({
+  username: z.string().min(3, 'Username must be at least 3 characters'),
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  phone_number: z.string().min(10, 'Invalid phone number (10+ digits)').max(15, 'Phone number too long'),
+  full_name: z.string().min(2, 'Full name is required'),
+  id_number: z.string().min(1, 'ID number is required'),
+  business_name: z.string().optional(),
+  business_type: z.string().optional(),
+  tin_number: z.string().optional(),
+  emergency_contact: z.string().optional(),
+  address: z.string().optional(),
+})
+
+type SellerFormData = z.infer<typeof sellerSchema>
+
+// Helper component for cleaner input rendering
+const FormField = ({ id, label, register, error, type = 'text', placeholder, children, required = false }: any) => (
+    <div className="flex flex-col space-y-1">
+        <label htmlFor={id} className="text-sm font-semibold text-gray-700 flex items-center">
+            {label} {required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+        {type === 'textarea' ? (
+            <textarea
+                id={id}
+                {...register(id)}
+                placeholder={placeholder}
+                rows={3}
+                className={`w-full p-3 border rounded-lg focus:ring-2 transition duration-150 ease-in-out ${
+                    error ? 'border-red-400 focus:border-red-500 focus:ring-red-100' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-100'
+                }`}
+            />
+        ) : (
+            <input
+                id={id}
+                type={type}
+                {...register(id)}
+                placeholder={placeholder}
+                className={`w-full p-3 border rounded-lg focus:ring-2 transition duration-150 ease-in-out ${
+                    error ? 'border-red-400 focus:border-red-500 focus:ring-red-100' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-100'
+                }`}
+            />
+        )}
+        {error && (
+            <p className="mt-1 text-xs text-red-600 font-medium flex items-center">
+                {error.message}
+            </p>
+        )}
+        {children}
+    </div>
+);
+
+
+const SellerRegistration = () => {
+  const [isLoading, setIsLoading] = useState(false)
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+  } = useForm<SellerFormData>({
+    resolver: zodResolver(sellerSchema),
+    defaultValues: {
+        username: '',
+        email: '',
+        password: '',
+        phone_number: '',
+        full_name: '',
+        id_number: '',
     }
-  )
+  })
 
-  const handleVerify = (seller: Seller, status: 'verified' | 'rejected') => {
-    if (confirm(`Are you sure you want to ${status === 'verified' ? 'verify' : 'reject'} this seller?`)) {
-      verifyMutation.mutate({ id: seller.seller_id!, status })
-    }
-  }
-
-  const handleViewDetails = async (seller: Seller) => {
+  const onSubmit = async (data: SellerFormData) => {
+    setIsLoading(true)
     try {
-      const response = await sellerService.getById(seller.seller_id!)
+      // Ensure business fields are included even if undefined
+      const registerData: RegisterData = {
+        ...data,
+        user_type: 'seller',
+        registration_date: new Date().toISOString().split('T')[0],
+      }
+      
+      // Removed password from the data if it was set as optional, but Zod schema requires it.
+      // We keep 'password' as RegisterData type implies it's required for registration.
+
+      const response = await authService.register(registerData)
       if (response.success) {
-        setSelectedSeller(response.data)
-        setShowDetails(true)
-        
-        // Load seller statistics
-        try {
-          const statsResponse = await sellerService.getStatistics(seller.seller_id!)
-          if (statsResponse.success) {
-            setSellerStats(statsResponse.data)
-          }
-        } catch (e) {
-          console.error('Failed to load statistics')
-        }
-        
-        // Load seller allocations
-        try {
-          const allocResponse = await sellerService.getAllocations(seller.seller_id!)
-          if (allocResponse.success) {
-            setSellerAllocations(allocResponse.data || [])
-          }
-        } catch (e) {
-          console.error('Failed to load allocations')
-        }
-        
-        // Load seller payments
-        try {
-          const payResponse = await sellerService.getPayments(seller.seller_id!)
-          if (payResponse.success) {
-            setSellerPayments(payResponse.data || [])
-          }
-        } catch (e) {
-          console.error('Failed to load payments')
-        }
+        toast.success(`Seller "${data.full_name}" registered successfully!`)
+        reset()
       }
     } catch (error: any) {
-      toast.error('Failed to load seller details')
+      toast.error(error.response?.data?.message || 'Registration failed. Please check the details and try again.')
+    } finally {
+      setIsLoading(false)
     }
-  }
-
-  const getStatusBadge = (status: string) => {
-    const badges = {
-      verified: 'bg-green-100 text-green-800',
-      pending: 'bg-yellow-100 text-yellow-800',
-      rejected: 'bg-red-100 text-red-800',
-    }
-    return badges[status as keyof typeof badges] || 'bg-gray-100 text-gray-800'
-  }
-
-  if (isLoading) {
-    return <div className="text-center py-12">Loading sellers...</div>
   }
 
   return (
-    <div>
+    <div className="p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Seller Management</h1>
-        <Link to="/seller-registration" className="btn btn-primary">
-          Register New Seller
-        </Link>
+        <h1 className="text-3xl font-bold text-gray-900">Seller Registration</h1>
       </div>
 
-      <div className="card mb-6">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-            <input
-              type="text"
-              placeholder="Search by name, business, or ID number..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="input pl-10"
-            />
+      <div className="bg-white p-6 md:p-10 rounded-xl shadow-2xl max-w-4xl mx-auto border border-gray-100">
+        <div className="mb-8 border-b pb-4">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-blue-50 rounded-full mb-3 shadow-md">
+            <UserPlus className="w-7 h-7 text-blue-600" />
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="input w-auto"
-          >
-            <option value="all">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="verified">Verified</option>
-            <option value="rejected">Rejected</option>
-          </select>
+          <h2 className="text-2xl font-extrabold text-gray-900">Create New Seller Account</h2>
+          <p className="text-gray-500 mt-1">Please provide accurate personal and business details for verification.</p>
         </div>
-      </div>
 
-      <div className="card">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Name</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Business</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">ID Number</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Email</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Registered</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sellers?.map((seller: Seller) => (
-                <tr key={seller.seller_id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-3 px-4 font-medium">{seller.full_name}</td>
-                  <td className="py-3 px-4">{seller.business_name || 'N/A'}</td>
-                  <td className="py-3 px-4">{seller.id_number}</td>
-                  <td className="py-3 px-4">{seller.email || 'N/A'}</td>
-                  <td className="py-3 px-4">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusBadge(seller.verification_status || 'pending')}`}>
-                      {seller.verification_status || 'pending'}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    {seller.registration_date
-                      ? format(new Date(seller.registration_date), 'MMM dd, yyyy')
-                      : 'N/A'}
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleViewDetails(seller)}
-                        className="text-primary-600 hover:text-primary-700"
-                        title="View Details"
-                      >
-                        <Eye size={18} />
-                      </button>
-                      {seller.verification_status === 'pending' && (
-                        <>
-                          <button
-                            onClick={() => handleVerify(seller, 'verified')}
-                            className="text-green-600 hover:text-green-700"
-                            title="Verify"
-                          >
-                            <UserCheck size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleVerify(seller, 'rejected')}
-                            className="text-red-600 hover:text-red-700"
-                            title="Reject"
-                          >
-                            <UserX size={18} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!sellers?.length && (
-            <div className="text-center py-8 text-gray-500">No sellers found</div>
-          )}
-        </div>
-      </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+          
+          {/* Section 1: Personal Credentials */}
+          <div className="space-y-4">
+            <h3 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4 flex items-center">
+                Personal Information
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField 
+                id="full_name" 
+                label="Full Name" 
+                register={register} 
+                error={errors.full_name} 
+                placeholder="John Doe" 
+                required
+              />
 
-      {showDetails && selectedSeller && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">Seller Details</h2>
-              <button
-                onClick={() => {
-                  setShowDetails(false)
-                  setSelectedSeller(null)
-                  setSellerStats(null)
-                  setSellerAllocations([])
-                  setSellerPayments([])
-                }}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </button>
+              <FormField 
+                id="id_number" 
+                label="National ID/Passport Number" 
+                register={register} 
+                error={errors.id_number} 
+                placeholder="e.g., 123456789X" 
+                required
+              />
+
+              <FormField 
+                id="username" 
+                label="Username" 
+                register={register} 
+                error={errors.username} 
+                placeholder="unique_seller_name" 
+                required
+              />
+
+              <FormField 
+                id="email" 
+                label="Email Address" 
+                register={register} 
+                error={errors.email} 
+                type="email"
+                placeholder="contact@business.com" 
+                required
+              />
+              
+              <FormField 
+                id="phone_number" 
+                label="Phone Number" 
+                register={register} 
+                error={errors.phone_number} 
+                type="tel"
+                placeholder="e.g., +123 456 7890" 
+                required
+              />
+
+              <FormField 
+                id="password" 
+                label="Password" 
+                register={register} 
+                error={errors.password} 
+                type="password"
+                placeholder="Must be at least 6 characters" 
+                required
+              />
             </div>
-            <div className="space-y-4">
-              {sellerStats && (
-                <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                  <h3 className="font-semibold text-gray-900 mb-3">Statistics</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <p className="text-sm text-gray-600">Total Allocations</p>
-                      <p className="text-xl font-bold text-gray-900">{sellerStats.total_allocations || 0}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Active Allocations</p>
-                      <p className="text-xl font-bold text-green-600">{sellerStats.active_allocations || 0}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Total Payments</p>
-                      <p className="text-xl font-bold text-gray-900">{sellerStats.total_payments || 0}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Total Paid</p>
-                      <p className="text-xl font-bold text-green-600">${(sellerStats.total_paid || 0).toFixed(2)}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Full Name</label>
-                  <p className="text-gray-900">{selectedSeller.full_name}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">ID Number</label>
-                  <p className="text-gray-900">{selectedSeller.id_number}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Email</label>
-                  <p className="text-gray-900">{selectedSeller.email || 'N/A'}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Phone</label>
-                  <p className="text-gray-900">{selectedSeller.phone_number || 'N/A'}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Business Name</label>
-                  <p className="text-gray-900">{selectedSeller.business_name || 'N/A'}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Business Type</label>
-                  <p className="text-gray-900">{selectedSeller.business_type || 'N/A'}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">TIN Number</label>
-                  <p className="text-gray-900">{selectedSeller.tin_number || 'N/A'}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Verification Status</label>
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusBadge(selectedSeller.verification_status || 'pending')}`}>
-                    {selectedSeller.verification_status || 'pending'}
-                  </span>
-                </div>
-                <div className="col-span-2">
-                  <label className="text-sm font-medium text-gray-600">Address</label>
-                  <p className="text-gray-900">{selectedSeller.address || 'N/A'}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Emergency Contact</label>
-                  <p className="text-gray-900">{selectedSeller.emergency_contact || 'N/A'}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Registration Date</label>
-                  <p className="text-gray-900">
-                    {selectedSeller.registration_date
-                      ? format(new Date(selectedSeller.registration_date), 'MMM dd, yyyy')
-                      : 'N/A'}
-                  </p>
-                </div>
+          </div>
+          
+          {/* Section 2: Business Details (Optional) */}
+          <div className="space-y-4 pt-4">
+            <h3 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4 flex items-center">
+                Business Details <span className="text-sm font-normal text-gray-400 ml-3">(Optional)</span>
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+              <FormField 
+                id="business_name" 
+                label="Business Name" 
+                register={register} 
+                error={errors.business_name} 
+                placeholder="The Best Shop LLC"
+              />
+
+              <FormField 
+                id="business_type" 
+                label="Business Type" 
+                register={register} 
+                error={errors.business_type} 
+                placeholder="Retail, Service, Manufacturing, etc."
+              />
+
+              <FormField 
+                id="tin_number" 
+                label="Tax Identification Number (TIN)" 
+                register={register} 
+                error={errors.tin_number} 
+                placeholder="Enter TIN"
+              />
+
+              <FormField 
+                id="emergency_contact" 
+                label="Emergency Contact Phone" 
+                register={register} 
+                error={errors.emergency_contact} 
+                type="tel"
+                placeholder="Contact person's phone number"
+              />
+
+              <div className="md:col-span-2">
+                <FormField 
+                  id="address" 
+                  label="Business Address" 
+                  register={register} 
+                  error={errors.address} 
+                  type="textarea"
+                  placeholder="Street Address, City, State/Province"
+                />
               </div>
-              
-              {sellerAllocations.length > 0 && (
-                <div className="mt-4">
-                  <h3 className="font-semibold text-gray-900 mb-3">Allocations ({sellerAllocations.length})</h3>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {sellerAllocations.slice(0, 5).map((alloc: any) => (
-                      <div key={alloc.allocation_id} className="bg-gray-50 p-2 rounded text-sm">
-                        <p className="font-medium">Space: {alloc.space_code || alloc.space_number} - Zone: {alloc.zone_name || alloc.zone_code}</p>
-                        <p className="text-gray-600">Status: {alloc.status} | Started: {format(new Date(alloc.start_date), 'MMM dd, yyyy')}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {sellerPayments.length > 0 && (
-                <div className="mt-4">
-                  <h3 className="font-semibold text-gray-900 mb-3">Recent Payments ({sellerPayments.length})</h3>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {sellerPayments.slice(0, 5).map((payment: any) => (
-                      <div key={payment.payment_id} className="bg-gray-50 p-2 rounded text-sm">
-                        <p className="font-medium">${payment.amount} - {payment.payment_method?.replace('_', ' ')}</p>
-                        <p className="text-gray-600">Status: {payment.status} | Date: {format(new Date(payment.payment_date), 'MMM dd, yyyy')}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+
             </div>
           </div>
-        </div>
-      )}
+
+
+          <div className="flex space-x-4 pt-6 justify-end border-t mt-8">
+            <button
+              type="button"
+              onClick={() => reset()}
+              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-100 transition-colors duration-200"
+            >
+              Clear Form
+            </button>
+            <button 
+              type="submit" 
+              disabled={isLoading} 
+              className={`px-6 py-3 flex items-center justify-center rounded-lg font-bold text-white transition-all duration-300 shadow-lg 
+                ${isLoading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/50'}`}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Registering...
+                </>
+              ) : (
+                'Register Seller Account'
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }
 
-export default Sellers
-
+export default SellerRegistration

@@ -4,12 +4,12 @@ import { authenticate } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
-// Public routes
-router.get('/', spaceController.getAllSpaces.bind(spaceController));
-router.get('/available', spaceController.getAvailableSpaces.bind(spaceController));
-router.get('/:id', spaceController.getSpaceById.bind(spaceController));
-router.get('/:id/availability', spaceController.checkAvailability.bind(spaceController));
-router.get('/:id/history', spaceController.getAllocationHistory.bind(spaceController));
+// Authenticated routes (needed for manager scoping)
+router.get('/', authenticate, spaceController.getAllSpaces.bind(spaceController));
+router.get('/available', authenticate, spaceController.getAvailableSpaces.bind(spaceController));
+router.get('/:id', authenticate, spaceController.getSpaceById.bind(spaceController));
+router.get('/:id/availability', authenticate, spaceController.checkAvailability.bind(spaceController));
+router.get('/:id/history', authenticate, spaceController.getAllocationHistory.bind(spaceController));
 
 // Protected routes
 router.post('/', authenticate, spaceController.createSpace.bind(spaceController));

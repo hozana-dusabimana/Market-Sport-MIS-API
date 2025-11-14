@@ -14,6 +14,12 @@ class NotificationController {
         offset: req.query.offset ? parseInt(req.query.offset) : 0
       };
 
+      // Auto-scope to manager's sellers when requester is a manager
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
+      if (req.user?.user_type === 'manager' && managerId) {
+        filters.manager_id = managerId;
+      }
+
       const notifications = await Notification.findAll(filters);
 
       res.json({
@@ -35,6 +41,24 @@ class NotificationController {
 
       if (!notification) {
         return res.status(404).json({ success: false, message: 'Notification not found' });
+      }
+
+      // Enforce ownership for managers: either the notification is for their seller, or addressed to themselves
+      if (req.user?.user_type === 'manager') {
+        const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
+        const currentUserId = req.user?.user_id || req.user?.id;
+        if (!managerId) {
+          return res.status(403).json({ success: false, message: 'Forbidden: manager id missing' });
+        }
+        if (notification.seller_id) {
+          const [rows] = await db.query('SELECT manager_id FROM sellers WHERE seller_id = ? LIMIT 1', [notification.seller_id]);
+          const sellerManagerId = rows?.[0]?.manager_id;
+          if (!sellerManagerId || sellerManagerId !== managerId) {
+            return res.status(403).json({ success: false, message: 'Forbidden: notification not owned by manager' });
+          }
+        } else if (notification.user_id && notification.user_id !== currentUserId) {
+          return res.status(403).json({ success: false, message: 'Forbidden: notification not owned by manager' });
+        }
       }
 
       res.json({
@@ -96,6 +120,24 @@ class NotificationController {
         });
       }
 
+      // For managers: can only create notifications for their own sellers, and only address self when not tied to a seller
+      if (req.user?.user_type === 'manager') {
+        const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
+        const currentUserId = req.user?.user_id || req.user?.id;
+        if (!managerId) {
+          return res.status(403).json({ success: false, message: 'Forbidden: manager id missing' });
+        }
+        if (seller_id) {
+          const [rows] = await db.query('SELECT manager_id FROM sellers WHERE seller_id = ? LIMIT 1', [seller_id]);
+          const sellerManagerId = rows?.[0]?.manager_id;
+          if (!sellerManagerId || sellerManagerId !== managerId) {
+            return res.status(403).json({ success: false, message: 'Forbidden: cannot notify another manager\'s seller' });
+          }
+        } else if (user_id !== currentUserId) {
+          return res.status(403).json({ success: false, message: 'Forbidden: managers can only create self-addressed notifications when not tied to a seller' });
+        }
+      }
+
       const notificationId = await Notification.create({
         user_id,
         seller_id,
@@ -129,6 +171,24 @@ class NotificationController {
         return res.status(404).json({ success: false, message: 'Notification not found' });
       }
 
+      // Ownership enforcement for managers
+      if (req.user?.user_type === 'manager') {
+        const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
+        const currentUserId = req.user?.user_id || req.user?.id;
+        if (!managerId) {
+          return res.status(403).json({ success: false, message: 'Forbidden: manager id missing' });
+        }
+        if (notification.seller_id) {
+          const [rows] = await db.query('SELECT manager_id FROM sellers WHERE seller_id = ? LIMIT 1', [notification.seller_id]);
+          const sellerManagerId = rows?.[0]?.manager_id;
+          if (!sellerManagerId || sellerManagerId !== managerId) {
+            return res.status(403).json({ success: false, message: 'Forbidden: notification not owned by manager' });
+          }
+        } else if (notification.user_id && notification.user_id !== currentUserId) {
+          return res.status(403).json({ success: false, message: 'Forbidden: notification not owned by manager' });
+        }
+      }
+
       const updated = await Notification.update(id, updates);
 
       if (!updated) {
@@ -152,6 +212,28 @@ class NotificationController {
         return res.status(400).json({ success: false, message: 'Status is required' });
       }
 
+      // Ownership enforcement for managers
+      const notification = await Notification.findById(id);
+      if (!notification) {
+        return res.status(404).json({ success: false, message: 'Notification not found' });
+      }
+      if (req.user?.user_type === 'manager') {
+        const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
+        const currentUserId = req.user?.user_id || req.user?.id;
+        if (!managerId) {
+          return res.status(403).json({ success: false, message: 'Forbidden: manager id missing' });
+        }
+        if (notification.seller_id) {
+          const [rows] = await db.query('SELECT manager_id FROM sellers WHERE seller_id = ? LIMIT 1', [notification.seller_id]);
+          const sellerManagerId = rows?.[0]?.manager_id;
+          if (!sellerManagerId || sellerManagerId !== managerId) {
+            return res.status(403).json({ success: false, message: 'Forbidden: notification not owned by manager' });
+          }
+        } else if (notification.user_id && notification.user_id !== currentUserId) {
+          return res.status(403).json({ success: false, message: 'Forbidden: notification not owned by manager' });
+        }
+      }
+
       const updated = await Notification.updateStatus(id, status);
 
       if (!updated) {
@@ -169,6 +251,27 @@ class NotificationController {
   async markAsRead(req, res) {
     try {
       const { id } = req.params;
+      // Ownership enforcement for managers
+      const notification = await Notification.findById(id);
+      if (!notification) {
+        return res.status(404).json({ success: false, message: 'Notification not found' });
+      }
+      if (req.user?.user_type === 'manager') {
+        const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
+        const currentUserId = req.user?.user_id || req.user?.id;
+        if (!managerId) {
+          return res.status(403).json({ success: false, message: 'Forbidden: manager id missing' });
+        }
+        if (notification.seller_id) {
+          const [rows] = await db.query('SELECT manager_id FROM sellers WHERE seller_id = ? LIMIT 1', [notification.seller_id]);
+          const sellerManagerId = rows?.[0]?.manager_id;
+          if (!sellerManagerId || sellerManagerId !== managerId) {
+            return res.status(403).json({ success: false, message: 'Forbidden: notification not owned by manager' });
+          }
+        } else if (notification.user_id && notification.user_id !== currentUserId) {
+          return res.status(403).json({ success: false, message: 'Forbidden: notification not owned by manager' });
+        }
+      }
       const updated = await Notification.markAsRead(id);
 
       if (!updated) {
@@ -194,6 +297,30 @@ class NotificationController {
         });
       }
 
+      // Optional: For managers, filter to only those they own
+      if (req.user?.user_type === 'manager') {
+        const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
+        if (!managerId) {
+          return res.status(403).json({ success: false, message: 'Forbidden: manager id missing' });
+        }
+        // Reduce to notifications owned by manager (seller owned or self-addressed)
+        const placeholders = notification_ids.map(() => '?').join(',');
+        const [rows] = await db.query(
+          `SELECT n.notification_id, n.user_id, n.seller_id, s.manager_id
+           FROM notifications n
+           LEFT JOIN sellers s ON n.seller_id = s.seller_id
+           WHERE n.notification_id IN (${placeholders})`,
+          notification_ids
+        );
+        const currentUserId = req.user?.user_id || req.user?.id;
+        const allowed = rows.filter(r => (r.seller_id ? r.manager_id === managerId : r.user_id === currentUserId)).map(r => r.notification_id);
+        if (allowed.length === 0) {
+          return res.json({ success: true, message: 'No notifications eligible to mark as read', count: 0 });
+        }
+        const count = await Notification.markMultipleAsRead(allowed);
+        return res.json({ success: true, message: `${count} notification(s) marked as read`, count });
+      }
+
       const count = await Notification.markMultipleAsRead(notification_ids);
 
       res.json({
@@ -211,6 +338,28 @@ class NotificationController {
   async deleteNotification(req, res) {
     try {
       const { id } = req.params;
+
+      // Ownership enforcement for managers
+      const notification = await Notification.findById(id);
+      if (!notification) {
+        return res.status(404).json({ success: false, message: 'Notification not found' });
+      }
+      if (req.user?.user_type === 'manager') {
+        const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
+        const currentUserId = req.user?.user_id || req.user?.id;
+        if (!managerId) {
+          return res.status(403).json({ success: false, message: 'Forbidden: manager id missing' });
+        }
+        if (notification.seller_id) {
+          const [rows] = await db.query('SELECT manager_id FROM sellers WHERE seller_id = ? LIMIT 1', [notification.seller_id]);
+          const sellerManagerId = rows?.[0]?.manager_id;
+          if (!sellerManagerId || sellerManagerId !== managerId) {
+            return res.status(403).json({ success: false, message: 'Forbidden: notification not owned by manager' });
+          }
+        } else if (notification.user_id && notification.user_id !== currentUserId) {
+          return res.status(403).json({ success: false, message: 'Forbidden: notification not owned by manager' });
+        }
+      }
 
       const deleted = await Notification.delete(id);
 
@@ -248,3 +397,4 @@ class NotificationController {
 }
 
 export default new NotificationController();
+

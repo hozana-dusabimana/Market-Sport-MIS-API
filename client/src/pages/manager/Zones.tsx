@@ -7,6 +7,7 @@ import { Plus, Edit, Trash2, Search, Eye } from 'lucide-react'
 
 const ManagerZones = () => {
   const { user } = useAuthStore()
+  const managerProfileId = (user as any)?.profile?.manager_id || user?.userId
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingZone, setEditingZone] = useState<Zone | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -17,57 +18,56 @@ const ManagerZones = () => {
     zone_name: '',
     zone_code: '',
     description: '',
-    location: '',
-    manager_id: user?.userId,
     total_spaces: 0,
     status: 'active',
   })
 
   const queryClient = useQueryClient()
-  
-  // Filter by manager's assigned zones
-  const managedZoneIds = user?.user_type === 'manager' && user?.profile?.assigned_zones
-    ? user.profile.assigned_zones
-    : []
-  
-  const managerId = user?.userId
+
+  // Fetch zones assigned to the manager
   const { data, isLoading } = useQuery(
-    ['zones', statusFilter, searchTerm, managerId],
-    () => zoneService.getAll({ 
-      status: statusFilter !== 'all' ? statusFilter : undefined, 
-      search: searchTerm || undefined,
-      manager_id: managerId,
-    }),
+    ['zones', statusFilter, searchTerm],
+    () =>
+      zoneService.getAll({
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        search: searchTerm || undefined,
+        manager_id: user?.user_type === 'manager' ? managerProfileId : undefined,
+      }),
     {
       retry: false,
       onError: () => {},
     }
   )
-  
+
   const allZones = data?.data || []
-  // Filter by assigned zones
-  const zones = managedZoneIds.length > 0
-    ? allZones.filter((z: Zone) => managedZoneIds.includes(z.zone_id!))
-    : allZones
-  
+
+  const filteredZones = allZones.filter((zone: Zone) => {
+    const matchesSearch =
+      !searchTerm ||
+      zone.zone_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      zone.zone_code.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesStatus = statusFilter === 'all' || zone.status === statusFilter
+    return matchesSearch && matchesStatus
+  })
+
   const { data: zoneStats } = useQuery(
     ['zone-stats', selectedZone?.zone_id],
-    () => zoneService.getStatistics(selectedZone?.zone_id!),
+    () => zoneService.getStatistics(selectedZone!.zone_id!),
     { enabled: !!selectedZone?.zone_id && showDetails, retry: false, onError: () => {} }
   )
-  
+
   const { data: zoneSpaces } = useQuery(
     ['zone-spaces', selectedZone?.zone_id],
-    () => zoneService.getSpaces(selectedZone?.zone_id!),
+    () => zoneService.getSpaces(selectedZone!.zone_id!),
     { enabled: !!selectedZone?.zone_id && showDetails, retry: false, onError: () => {} }
   )
-  
+
   const { data: zoneDetails } = useQuery(
     ['zone-details', selectedZone?.zone_id],
-    () => zoneService.getById(selectedZone?.zone_id!),
+    () => zoneService.getById(selectedZone!.zone_id!),
     { enabled: !!selectedZone?.zone_id && showDetails, retry: false, onError: () => {} }
   )
-  
+
   const zoneStatistics = zoneDetails?.data?.stats || zoneStats?.data
   const spacesInZone = zoneDetails?.data?.spaces || zoneSpaces?.data || []
 
@@ -114,8 +114,6 @@ const ManagerZones = () => {
       zone_name: '',
       zone_code: '',
       description: '',
-      location: '',
-      manager_id: user?.userId,
       total_spaces: 0,
       status: 'active',
     })
@@ -123,8 +121,8 @@ const ManagerZones = () => {
   }
 
   const handleEdit = (zone: Zone) => {
-    if (managedZoneIds.length > 0 && !managedZoneIds.includes(zone.zone_id!)) {
-      toast.error('You can only edit zones assigned to you')
+    if (user?.user_type === 'manager' && zone.manager_id && zone.manager_id !== managerProfileId) {
+      toast.error('You can only edit zones you manage')
       return
     }
     setEditingZone(zone)
@@ -132,8 +130,6 @@ const ManagerZones = () => {
       zone_name: zone.zone_name,
       zone_code: zone.zone_code,
       description: zone.description || '',
-      location: zone.location || '',
-      manager_id: zone.manager_id || user?.userId,
       total_spaces: zone.total_spaces || 0,
       status: zone.status,
     })
@@ -147,29 +143,31 @@ const ManagerZones = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // For managers, ensure they can only create/edit zones in their assigned zones
-    if (user?.user_type === 'manager') {
-      // When creating, assign zone to manager
-      if (!editingZone) {
-        formData.manager_id = user.userId
-      } else {
-        // When editing, ensure manager can only edit their own zones
-        if (!managedZoneIds.includes(editingZone.zone_id!)) {
-          toast.error('You can only edit zones assigned to you')
-          return
-        }
-      }
+    if (user?.user_type === 'manager' && !managerProfileId) {
+      toast.error('Your manager profile is not set up. Please contact admin to complete your manager profile before creating zones.')
+      return
     }
+
+    const payload: Zone = {
+      zone_name: formData.zone_name!,
+      zone_code: formData.zone_code!,
+      description: formData.description || '',
+      total_spaces: formData.total_spaces || 0,
+      status: formData.status || 'active',
+      ...(user?.user_type === 'manager' ? { manager_id: managerProfileId } : {}),
+    }
+
     if (editingZone) {
-      updateMutation.mutate({ id: editingZone.zone_id!, zone: formData })
+      updateMutation.mutate({ id: editingZone.zone_id!, zone: payload })
     } else {
-      createMutation.mutate(formData as Zone)
+      createMutation.mutate(payload)
     }
   }
 
-  const handleDelete = (id: number, zone: Zone) => {
-    if (managedZoneIds.length > 0 && !managedZoneIds.includes(zone.zone_id!)) {
-      toast.error('You can only delete zones assigned to you')
+  const handleDelete = (id: number) => {
+    const zone = filteredZones.find(z => z.zone_id === id)
+    if (user?.user_type === 'manager' && zone && zone.manager_id && zone.manager_id !== managerProfileId) {
+      toast.error('You can only delete zones you manage')
       return
     }
     if (window.confirm('Are you sure you want to delete this zone?')) {
@@ -177,20 +175,13 @@ const ManagerZones = () => {
     }
   }
 
-  const filteredZones = zones.filter((zone: Zone) => {
-    const matchesSearch = !searchTerm || 
-      zone.zone_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      zone.zone_code.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || zone.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
-
   if (isLoading) {
     return <div className="text-center py-12">Loading zones...</div>
   }
 
   return (
     <div>
+      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Managed Zones</h1>
         <button
@@ -208,17 +199,15 @@ const ManagerZones = () => {
       {/* Filters */}
       <div className="card mb-6">
         <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="text"
-                placeholder="Search zones..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="input pl-10"
-              />
-            </div>
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <input
+              type="text"
+              placeholder="Search zones..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="input pl-10"
+            />
           </div>
           <select
             value={statusFilter}
@@ -233,75 +222,59 @@ const ManagerZones = () => {
       </div>
 
       {/* Zones Table */}
-      <div className="card">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Zone Code</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Zone Name</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Description</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Total Spaces</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredZones.length > 0 ? (
-                filteredZones.map((zone: Zone) => (
-                  <tr key={zone.zone_id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-4 font-medium">{zone.zone_code}</td>
-                    <td className="py-3 px-4">{zone.zone_name}</td>
-                    <td className="py-3 px-4 text-gray-600">{zone.description || 'N/A'}</td>
-                    <td className="py-3 px-4">{zone.total_spaces || 0}</td>
-                    <td className="py-3 px-4">
-                      <span
-                        className={`px-2 py-1 rounded text-xs font-medium ${
-                          zone.status === 'active'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {zone.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => handleViewDetails(zone)}
-                          className="text-primary-600 hover:text-primary-700"
-                          title="View Details"
-                        >
-                          <Eye size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleEdit(zone)}
-                          className="text-blue-600 hover:text-blue-700"
-                          title="Edit"
-                        >
-                          <Edit size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(zone.zone_id!, zone)}
-                          className="text-red-600 hover:text-red-700"
-                          title="Delete"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="py-8 text-center text-gray-500">
-                    No zones found
+      <div className="card overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-gray-200">
+              <th className="text-left py-3 px-4 font-semibold text-gray-700">Zone Code</th>
+              <th className="text-left py-3 px-4 font-semibold text-gray-700">Zone Name</th>
+              <th className="text-left py-3 px-4 font-semibold text-gray-700">Description</th>
+              <th className="text-left py-3 px-4 font-semibold text-gray-700">Total Spaces</th>
+              <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
+              <th className="text-left py-3 px-4 font-semibold text-gray-700">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredZones.length > 0 ? (
+              filteredZones.map((zone: Zone) => (
+                <tr key={zone.zone_id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="py-3 px-4 font-medium">{zone.zone_code}</td>
+                  <td className="py-3 px-4">{zone.zone_name}</td>
+                  <td className="py-3 px-4 text-gray-600">{zone.description || 'N/A'}</td>
+                  <td className="py-3 px-4">{zone.total_spaces || 0}</td>
+                  <td className="py-3 px-4">
+                    <span
+                      className={`px-2 py-1 rounded text-xs font-medium ${
+                        zone.status === 'active'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}
+                    >
+                      {zone.status}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 flex items-center space-x-2">
+                    <button onClick={() => handleViewDetails(zone)} className="text-primary-600 hover:text-primary-700">
+                      <Eye size={18} />
+                    </button>
+                    <button onClick={() => handleEdit(zone)} className="text-blue-600 hover:text-blue-700">
+                      <Edit size={18} />
+                    </button>
+                    <button onClick={() => handleDelete(zone.zone_id!)} className="text-red-600 hover:text-red-700">
+                      <Trash2 size={18} />
+                    </button>
                   </td>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={6} className="py-8 text-center text-gray-500">
+                  No zones found
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
       {/* Create/Edit Modal */}
@@ -343,20 +316,13 @@ const ManagerZones = () => {
                   />
                 </div>
                 <div>
-                  <label className="label">Location</label>
-                  <input
-                    type="text"
-                    value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    className="input"
-                  />
-                </div>
-                <div>
                   <label className="label">Total Spaces</label>
                   <input
                     type="number"
                     value={formData.total_spaces}
-                    onChange={(e) => setFormData({ ...formData, total_spaces: parseInt(e.target.value) || 0 })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, total_spaces: parseInt(e.target.value) || 0 })
+                    }
                     className="input"
                     min="0"
                   />
@@ -417,7 +383,6 @@ const ManagerZones = () => {
                   <p><span className="font-medium">Code:</span> {selectedZone.zone_code}</p>
                   <p><span className="font-medium">Name:</span> {selectedZone.zone_name}</p>
                   <p><span className="font-medium">Description:</span> {selectedZone.description || 'N/A'}</p>
-                  <p><span className="font-medium">Location:</span> {selectedZone.location || 'N/A'}</p>
                   <p><span className="font-medium">Status:</span> {selectedZone.status}</p>
                   <p><span className="font-medium">Total Spaces:</span> {selectedZone.total_spaces || 0}</p>
                 </div>
@@ -457,9 +422,11 @@ const ManagerZones = () => {
                           <td className="py-2 px-3">{space.space_type || 'N/A'}</td>
                           <td className="py-2 px-3">
                             <span className={`px-2 py-1 rounded text-xs ${
-                              space.status === 'available' ? 'bg-green-100 text-green-800' :
-                              space.status === 'occupied' ? 'bg-blue-100 text-blue-800' :
-                              'bg-gray-100 text-gray-800'
+                              space.status === 'available'
+                                ? 'bg-green-100 text-green-800'
+                                : space.status === 'occupied'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-gray-100 text-gray-800'
                             }`}>
                               {space.status}
                             </span>
@@ -480,5 +447,3 @@ const ManagerZones = () => {
 }
 
 export default ManagerZones
-
-

@@ -11,6 +11,12 @@ class ZoneController {
         search: req.query.search
       };
 
+      // Auto-scope to manager's zones when requester is a manager
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
+      if (req.user?.user_type === 'manager' && managerId) {
+        filters.manager_id = managerId;
+      }
+
       const zones = await Zone.findAll(filters);
 
       res.json({
@@ -34,6 +40,12 @@ class ZoneController {
         return res.status(404).json({ success: false, message: 'Zone not found' });
       }
 
+      // Enforce ownership for managers
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
+      if (req.user?.user_type === 'manager' && managerId && zone.manager_id !== managerId) {
+        return res.status(403).json({ success: false, message: 'Forbidden: zone not owned by manager' });
+      }
+
       // Get spaces in zone
       const spaces = await Zone.getSpaces(id);
       const stats = await Zone.getStatistics(id);
@@ -51,7 +63,7 @@ class ZoneController {
   // Create zone
   async createZone(req, res) {
     try {
-      const { zone_name, zone_code, description, manager_id, total_spaces, status } = req.body;
+      const { zone_name, zone_code, description, total_spaces, status } = req.body;
 
       if (!zone_name || !zone_code) {
         return res.status(400).json({ success: false, message: 'Zone name and code are required' });
@@ -63,11 +75,13 @@ class ZoneController {
         return res.status(409).json({ success: false, message: 'Zone code already exists' });
       }
 
+      // Manager derived from token (supports id, manager_id, or profile.manager_id)
+      const managerId = req.user?.id || req.user?.manager_id || req.user?.profile?.manager_id;
       const zoneId = await Zone.create({
         zone_name,
         zone_code,
         description,
-        manager_id,
+        manager_id: managerId,
         total_spaces: total_spaces || 0,
         status: status || 'active'
       });
@@ -129,6 +143,15 @@ class ZoneController {
   async getZoneSpaces(req, res) {
     try {
       const { id } = req.params;
+      // Verify zone ownership for managers before returning spaces
+      const zone = await Zone.findById(id);
+      if (!zone) {
+        return res.status(404).json({ success: false, message: 'Zone not found' });
+      }
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
+      if (req.user?.user_type === 'manager' && managerId && zone.manager_id !== managerId) {
+        return res.status(403).json({ success: false, message: 'Forbidden: zone not owned by manager' });
+      }
       const spaces = await Zone.getSpaces(id);
 
       res.json({
@@ -146,6 +169,16 @@ class ZoneController {
   async getZoneStats(req, res) {
     try {
       const { id } = req.params;
+      // Verify zone ownership for managers before returning statistics
+      const zone = await Zone.findById(id);
+      if (!zone) {
+        return res.status(404).json({ success: false, message: 'Zone not found' });
+      }
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
+      if (req.user?.user_type === 'manager' && managerId && zone.manager_id !== managerId) {
+        return res.status(403).json({ success: false, message: 'Forbidden: zone not owned by manager' });
+      }
+
       const stats = await Zone.getStatistics(id);
 
       res.json({

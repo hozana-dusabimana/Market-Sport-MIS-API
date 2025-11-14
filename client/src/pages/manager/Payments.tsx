@@ -6,7 +6,7 @@ import { sellerService } from '../../services/sellerService'
 import { spaceService } from '../../services/spaceService'
 import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
-import { Plus, Download, CreditCard, DollarSign } from 'lucide-react'
+import { Plus, Download, DollarSign } from 'lucide-react'
 import { format, subMonths } from 'date-fns'
 
 const ManagerPayments = () => {
@@ -27,6 +27,7 @@ const ManagerPayments = () => {
 
   const queryClient = useQueryClient()
   const managedZoneIds = user?.profile?.assigned_zones || []
+  const managerId = (user as any)?.profile?.manager_id || (user as any)?.profile?.id || (user as any)?.manager_id || null
 
   // Fetch allocations to filter payments by manager's zones
   const { data: allocationsData } = useQuery(
@@ -53,30 +54,14 @@ const ManagerPayments = () => {
     { retry: false, onError: () => {} }
   )
   
-  const { data: revenueData } = useQuery(
-    ['revenue-total', dateFrom, dateTo],
-    () => paymentService.getTotalRevenue({ date_from: dateFrom, date_to: dateTo }),
-    { retry: false, onError: () => {} }
-  )
-  
-  const { data: revenueByZone } = useQuery(
-    ['revenue-by-zone', dateFrom, dateTo],
-    () => paymentService.getRevenueByZone({ date_from: dateFrom, date_to: dateTo }),
-    { retry: false, onError: () => {} }
-  )
-  
-  const { data: revenueByMethod } = useQuery(
-    ['revenue-by-method', dateFrom, dateTo],
-    () => paymentService.getRevenueByMethod({ date_from: dateFrom, date_to: dateTo }),
-    { retry: false, onError: () => {} }
-  )
+  // We will compute revenue summaries from manager-filtered payments on the client side
   
   const { data: allocationsListData } = useQuery('allocations-list', () => allocationService.getAll(), {
     retry: false,
     onError: () => {},
   })
   
-  const { data: sellersData } = useQuery('sellers-list-payments', () => sellerService.getAll(), {
+  const { data: sellersData } = useQuery(['sellers-list-payments', managerId], () => sellerService.getAll(managerId ? { manager_id: managerId } : undefined), {
     retry: false,
     onError: () => {},
   })
@@ -92,14 +77,20 @@ const ManagerPayments = () => {
     : allSpacesFromPayments
   const managedSpaceIdsForPayments = managedSpacesForPayments.map((s: any) => s.space_id)
   const managedAllocationsForPayments = managedZoneIds.length > 0
-    ? allAllocationsForPayments.filter((a: any) => managedSpaceIdsForPayments.includes(a.space_id))
+    ? allAllocationsForPayments.filter((a: any) => managedSpaceIdsForPayments.includes(a.space_id) || (managerId && a.manager_id === managerId))
     : allAllocationsForPayments
   const managedAllocationIdsForPayments = managedAllocationsForPayments.map((a: any) => a.allocation_id)
   const payments = managedZoneIds.length > 0
     ? allPayments.filter((p: Payment) => managedAllocationIdsForPayments.includes(p.allocation_id))
     : allPayments
   const allocations = managedZoneIds.length > 0 ? managedAllocationsForPayments : allAllocationsForPayments
-  const totalRevenue = Number(revenueData?.data?.total_revenue) || 0
+  // Compute totals from filtered payments to respect manager scope fully
+  const totalRevenue = payments.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0)
+  const revenueByMethodLocal = payments.reduce((acc: Record<string, number>, p: any) => {
+    const key = p.payment_method || 'unknown'
+    acc[key] = (acc[key] || 0) + (Number(p.amount) || 0)
+    return acc
+  }, {})
 
   const createMutation = useMutation((payment: Payment) => {
     if (managedZoneIds.length > 0) {
@@ -132,7 +123,9 @@ const ManagerPayments = () => {
         toast.success('Payment status updated successfully')
       },
       onError: (error: any) => {
-        toast.error(error.response?.data?.message || 'Failed to update payment status')
+        if (error?.response?.status !== 403) {
+          toast.error(error.response?.data?.message || 'Failed to update payment status')
+        }
       },
     }
   )
@@ -199,14 +192,14 @@ const ManagerPayments = () => {
               </div>
             </div>
           </div>
-          {revenueByMethod?.data && revenueByMethod.data.length > 0 && (
+          {Object.keys(revenueByMethodLocal).length > 0 && (
             <div className="card col-span-2">
               <p className="text-sm font-medium text-gray-600 mb-3">Revenue by Payment Method</p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {revenueByMethod.data.map((method: any) => (
-                  <div key={method.payment_method} className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-600 capitalize">{method.payment_method?.replace('_', ' ')}</p>
-                    <p className="text-lg font-bold text-gray-900">${(Number(method.total) || 0).toFixed(2)}</p>
+                {Object.entries(revenueByMethodLocal).map(([method, total]) => (
+                  <div key={method} className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-600 capitalize">{String(method).replace('_', ' ')}</p>
+                    <p className="text-lg font-bold text-gray-900">${Number(total).toFixed(2)}</p>
                   </div>
                 ))}
               </div>
@@ -260,7 +253,7 @@ const ManagerPayments = () => {
       {/* Payments Table */}
       <div className="card">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="table">
             <thead>
               <tr className="border-b border-gray-200">
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Payment ID</th>
@@ -276,6 +269,7 @@ const ManagerPayments = () => {
               {payments.length > 0 ? (
                 payments.map((payment: Payment) => {
                   const seller = sellers.find((s: any) => (s.seller_id || s.user_id) === payment.seller_id)
+                  const owned = managerId && (payment as any).manager_id === managerId
                   return (
                     <tr key={payment.payment_id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-3 px-4">#{payment.payment_id}</td>
@@ -288,28 +282,44 @@ const ManagerPayments = () => {
                         {format(new Date(payment.payment_date), 'MMM dd, yyyy')}
                       </td>
                       <td className="py-3 px-4">
-                        <select
-                          value={payment.status}
-                          onChange={(e) => {
-                            if (window.confirm(`Change payment status to ${e.target.value}?`)) {
-                              updateStatusMutation.mutate({ id: payment.payment_id!, status: e.target.value })
-                            }
-                          }}
-                          className={`px-2 py-1 rounded text-xs font-medium border-0 ${
-                            payment.status === 'completed'
-                              ? 'bg-green-100 text-green-800'
-                              : payment.status === 'pending'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : payment.status === 'failed'
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="completed">Completed</option>
-                          <option value="failed">Failed</option>
-                          <option value="refunded">Refunded</option>
-                        </select>
+                        {owned ? (
+                          <select
+                            value={payment.status}
+                            onChange={(e) => {
+                              if (window.confirm(`Change payment status to ${e.target.value}?`)) {
+                                updateStatusMutation.mutate({ id: payment.payment_id!, status: e.target.value })
+                              }
+                            }}
+                            className={`px-2 py-1 rounded text-xs font-medium border-0 ${
+                              payment.status === 'completed'
+                                ? 'bg-green-100 text-green-800'
+                                : payment.status === 'pending'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : payment.status === 'failed'
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="completed">Completed</option>
+                            <option value="failed">Failed</option>
+                            <option value="refunded">Refunded</option>
+                          </select>
+                        ) : (
+                          <span
+                            className={`px-2 py-1 rounded text-xs font-medium ${
+                              payment.status === 'completed'
+                                ? 'bg-green-100 text-green-800'
+                                : payment.status === 'pending'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : payment.status === 'failed'
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {payment.status}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-4">
                         {payment.status === 'completed' && (
@@ -352,8 +362,8 @@ const ManagerPayments = () => {
 
       {/* Create Payment Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 fade-in">
+          <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto slide-up">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Record Payment</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -377,7 +387,16 @@ const ManagerPayments = () => {
                   <label className="label">Allocation *</label>
                   <select
                     value={formData.allocation_id}
-                    onChange={(e) => setFormData({ ...formData, allocation_id: parseInt(e.target.value) })}
+                    onChange={(e) => {
+                      const id = parseInt(e.target.value)
+                      const alloc = allocations.find((a: any) => a.allocation_id === id)
+                      setFormData({
+                        ...formData,
+                        allocation_id: id,
+                        // auto-sync seller_id with selected allocation to avoid mismatches
+                        seller_id: alloc ? alloc.seller_id : formData.seller_id,
+                      })
+                    }}
                     className="input"
                     required
                   >
@@ -451,6 +470,26 @@ const ManagerPayments = () => {
                     onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
                     className="input"
                     required
+                  />
+                </div>
+                <div>
+                  <label className="label">Period Start (optional)</label>
+                  <input
+                    type="date"
+                    value={(formData as any).payment_period_start || ''}
+                    onChange={(e) => setFormData({ ...formData, payment_period_start: e.target.value } as any)}
+                    className="input"
+                    placeholder="Start of covered period"
+                  />
+                </div>
+                <div>
+                  <label className="label">Period End (optional)</label>
+                  <input
+                    type="date"
+                    value={(formData as any).payment_period_end || ''}
+                    onChange={(e) => setFormData({ ...formData, payment_period_end: e.target.value } as any)}
+                    className="input"
+                    placeholder="End of covered period"
                   />
                 </div>
                 <div>

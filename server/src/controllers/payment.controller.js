@@ -17,6 +17,12 @@ class PaymentController {
         offset: req.query.offset ? parseInt(req.query.offset) : 0
       };
 
+      // Auto-scope to manager's market when requester is a manager
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
+      if (req.user?.user_type === 'manager' && managerId) {
+        filters.manager_id = managerId;
+      }
+
       const payments = await Payment.findAll(filters);
 
       res.json({
@@ -38,6 +44,12 @@ class PaymentController {
 
       if (!payment) {
         return res.status(404).json({ success: false, message: 'Payment not found' });
+      }
+
+      // Enforce ownership for managers using payment.manager_id (from zone)
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
+      if (req.user?.user_type === 'manager' && managerId && payment.manager_id !== managerId) {
+        return res.status(403).json({ success: false, message: 'Forbidden: payment not owned by manager' });
       }
 
       res.json({
@@ -73,6 +85,27 @@ class PaymentController {
           success: false,
           message: 'Allocation ID, Seller ID, and Amount are required'
         });
+      }
+
+      // Validate manager ownership of allocation for managers
+      if (req.user?.user_type === 'manager') {
+        const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
+        if (!managerId) {
+          return res.status(403).json({ success: false, message: 'Forbidden: manager id missing' });
+        }
+        const [allocRows] = await db.query(
+          `SELECT z.manager_id
+           FROM space_allocations sa
+           JOIN spaces sp ON sa.space_id = sp.space_id
+           JOIN zones z ON sp.zone_id = z.zone_id
+           WHERE sa.allocation_id = ? AND sa.seller_id = ?
+           LIMIT 1`,
+          [allocation_id, seller_id]
+        );
+        const allocManagerId = allocRows?.[0]?.manager_id;
+        if (!allocManagerId || allocManagerId !== managerId) {
+          return res.status(403).json({ success: false, message: 'Forbidden: cannot create payment for another manager\'s allocation' });
+        }
       }
 
       const paymentId = await Payment.create({
@@ -135,6 +168,27 @@ class PaymentController {
           success: false,
           message: 'Allocation not found or does not belong to this seller'
         });
+      }
+
+      // For managers: enforce allocation ownership
+      if (req.user?.user_type === 'manager') {
+        const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
+        if (!managerId) {
+          return res.status(403).json({ success: false, message: 'Forbidden: manager id missing' });
+        }
+        const [allocRows] = await db.query(
+          `SELECT z.manager_id
+           FROM space_allocations sa
+           JOIN spaces sp ON sa.space_id = sp.space_id
+           JOIN zones z ON sp.zone_id = z.zone_id
+           WHERE sa.allocation_id = ? AND sa.seller_id = ?
+           LIMIT 1`,
+          [allocation_id, seller_id]
+        );
+        const allocManagerId = allocRows?.[0]?.manager_id;
+        if (!allocManagerId || allocManagerId !== managerId) {
+          return res.status(403).json({ success: false, message: 'Forbidden: cannot process payment for another manager\'s allocation' });
+        }
       }
 
       // Format phone number for Lanari
@@ -222,6 +276,22 @@ class PaymentController {
         });
       }
 
+      // For managers: enforce allocation ownership
+      if (req.user?.user_type === 'manager') {
+        const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
+        if (!managerId) {
+          return res.status(403).json({ success: false, message: 'Forbidden: manager id missing' });
+        }
+        const [allocRows] = await db.query(
+          'SELECT manager_id FROM space_allocations WHERE allocation_id = ? AND seller_id = ? LIMIT 1',
+          [allocation_id, seller_id]
+        );
+        const allocManagerId = allocRows?.[0]?.manager_id;
+        if (!allocManagerId || allocManagerId !== managerId) {
+          return res.status(403).json({ success: false, message: 'Forbidden: cannot process payment for another manager\'s allocation' });
+        }
+      }
+
       // Format phone number
       const formattedPhone = lanariPaymentService.formatPhoneNumber(customer_phone);
 
@@ -286,6 +356,24 @@ class PaymentController {
         return res.status(404).json({ success: false, message: 'Payment not found' });
       }
 
+      // Enforce ownership for managers via zone ownership
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
+      if (req.user?.user_type === 'manager' && managerId) {
+        const [allocRows] = await db.query(
+          `SELECT z.manager_id
+           FROM space_allocations sa
+           JOIN spaces sp ON sa.space_id = sp.space_id
+           JOIN zones z ON sp.zone_id = z.zone_id
+           WHERE sa.allocation_id = ?
+           LIMIT 1`,
+          [payment.allocation_id]
+        );
+        const allocManagerId = allocRows?.[0]?.manager_id;
+        if (!allocManagerId || allocManagerId !== managerId) {
+          return res.status(403).json({ success: false, message: 'Forbidden: payment not owned by manager' });
+        }
+      }
+
       const updated = await Payment.update(id, updates);
 
       if (!updated) {
@@ -307,6 +395,16 @@ class PaymentController {
 
       if (!status) {
         return res.status(400).json({ success: false, message: 'Status is required' });
+      }
+
+      // Enforce ownership for managers via zone ownership
+      const payment = await Payment.findById(id);
+      if (!payment) {
+        return res.status(404).json({ success: false, message: 'Payment not found' });
+      }
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
+      if (req.user?.user_type === 'manager' && managerId && payment.manager_id !== managerId) {
+        return res.status(403).json({ success: false, message: 'Forbidden: payment not owned by manager' });
       }
 
       const updated = await Payment.updateStatus(id, status);

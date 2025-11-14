@@ -25,13 +25,23 @@ export const allocationService = {
     limit?: number
     offset?: number
   }) => {
-    const response = await api.get('/allocations', { params })
-    return response.data
+    try {
+      const response = await api.get('/allocations', { params })
+      return response.data
+    } catch (error) {
+      console.error('Failed to fetch allocations:', error)
+      throw error
+    }
   },
 
   getById: async (id: number) => {
-    const response = await api.get(`/allocations/${id}`)
-    return response.data
+    try {
+      const response = await api.get(`/allocations/${id}`)
+      return response.data
+    } catch (error) {
+      console.error(`Allocation ${id} not found:`, error)
+      throw error
+    }
   },
 
   create: async (allocation: Allocation) => {
@@ -44,7 +54,7 @@ export const allocationService = {
     return response.data
   },
 
-  updateStatus: async (id: number, status: string) => {
+  updateStatus: async (id: number, status: Allocation['status']) => {
     const response = await api.patch(`/allocations/${id}/status`, { status })
     return response.data
   },
@@ -65,9 +75,11 @@ export const allocationService = {
   },
 
   terminate: async (id: number, reason?: string) => {
-    // Use updateStatus instead of a separate terminate endpoint
-    return await allocationService.updateStatus(id, 'terminated')
+    // Optional: send reason if backend supports it
+    if (reason) {
+      const response = await api.patch(`/allocations/${id}/status`, { status: 'terminated', reason })
+      return response.data
+    }
+    return allocationService.updateStatus(id, 'terminated')
   },
 }
-
-
