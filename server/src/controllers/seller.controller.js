@@ -1,10 +1,12 @@
 import db from '../config/database.js';
-import Seller from '../models/Seller.model.js'; // Adjust path as needed
+import Seller from '../models/Seller.model.js';
+import NotificationService from '../services/notificationService.js';
 
 class SellerController {
   // Get all sellers with filters and pagination
   // Get all sellers with filters and pagination
   async getAllSellers(req, res) {
+
     try {
       const { id } = req.query; // Extract id from query params
 
@@ -42,7 +44,7 @@ class SellerController {
       // Scope to manager's sellers if requester is a manager
       const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
       if (req.user?.user_type === 'manager' && managerId) {
-        filters.manager_id = managerId;
+        filters.created_by_manager_id = managerId;
       }
 
       // Build count query for pagination
@@ -70,9 +72,9 @@ class SellerController {
         countValues.push(searchTerm, searchTerm, searchTerm);
       }
 
-      if (filters.manager_id) {
-        countQuery += ' AND s.manager_id = ?';
-        countValues.push(filters.manager_id);
+      if (filters.created_by_manager_id) {
+        countQuery += ' AND s.created_by_manager_id = ?';
+        countValues.push(filters.created_by_manager_id);
       }
 
       const [countResult] = await db.query(countQuery, countValues);
@@ -113,7 +115,7 @@ class SellerController {
 
       // Enforce ownership for managers
       const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
-      if (req.user?.user_type === 'manager' && managerId && seller.manager_id && seller.manager_id !== managerId) {
+      if (req.user?.user_type === 'manager' && managerId && seller.created_by_manager_id && seller.created_by_manager_id !== managerId) {
         return res.status(403).json({ success: false, message: 'Forbidden: seller not owned by manager' });
       }
 
@@ -203,7 +205,7 @@ class SellerController {
         id_number,
         business_name,
         business_type,
-        manager_id: creatorIsManager ? creatorManagerId : null,
+        created_by_manager_id: creatorIsManager ? creatorManagerId : null,
         tin_number,
         emergency_contact,
         address,
@@ -213,10 +215,16 @@ class SellerController {
 
       await connection.commit();
 
+      // Auto-create notification
+      await NotificationService.createSellerNotification({
+        seller_id: sellerId,
+        user_id: finalUserId
+      }, req.user?.user_id);
+
       res.status(201).json({
         success: true,
         message: 'Seller created successfully',
-        data: { sellerId, user_id: finalUserId, manager_id: creatorIsManager ? creatorManagerId : null }
+        data: { sellerId, user_id: finalUserId, created_by_manager_id: creatorIsManager ? creatorManagerId : null }
       });
 
     } catch (error) {
@@ -247,7 +255,7 @@ class SellerController {
 
       // Enforce ownership for managers
       const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
-      if (req.user?.user_type === 'manager' && managerId && seller.manager_id && seller.manager_id !== managerId) {
+      if (req.user?.user_type === 'manager' && managerId && seller.created_by_manager_id && seller.created_by_manager_id !== managerId) {
         await connection.rollback();
         return res.status(403).json({ success: false, message: 'Forbidden: seller not owned by manager' });
       }
@@ -312,6 +320,11 @@ class SellerController {
 
       await connection.commit();
 
+      // Auto-create notification if there were changes
+      if (updated) {
+        await NotificationService.updateSellerNotification(sellerId, { ...userUpdate, ...sellerUpdate }, req.user?.user_id);
+      }
+
       res.json({
         success: true,
         message: updated ? 'Seller updated successfully' : 'No changes made'
@@ -336,11 +349,40 @@ class SellerController {
         return res.status(400).json({ success: false, message: 'Invalid verification status' });
       }
 
+      // Fetch seller to enforce ownership and get user_id for account updates
+      const seller = await Seller.findById(id);
+      if (!seller) {
+        return res.status(404).json({ success: false, message: 'Seller not found' });
+      }
+
+      // Managers can only update their own sellers
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
+      if (req.user?.user_type === 'manager' && managerId && seller.created_by_manager_id && seller.created_by_manager_id !== managerId) {
+        return res.status(403).json({ success: false, message: 'Forbidden: seller not owned by manager' });
+      }
+
       const updated = await Seller.updateVerificationStatus(id, status);
 
       if (!updated) {
         return res.status(404).json({ success: false, message: 'Seller not found or no change' });
       }
+
+      // Sync linked user account status when verifying/rejecting
+      try {
+        if (seller.user_id) {
+          if (status === 'verified') {
+            await db.query('UPDATE users SET status = ? WHERE user_id = ?', ['active', seller.user_id]);
+          } else if (status === 'rejected') {
+            await db.query('UPDATE users SET status = ? WHERE user_id = ?', ['inactive', seller.user_id]);
+          }
+        }
+      } catch (e) {
+        // Non-fatal: log and continue
+        console.warn('Failed to sync user status for seller', id, e?.message);
+      }
+
+      // Auto-create notification
+      await NotificationService.updateSellerNotification(id, { verification_status: status }, req.user?.user_id);
 
       res.json({ success: true, message: `Verification status updated to ${status}` });
     } catch (error) {
@@ -359,7 +401,7 @@ class SellerController {
         return res.status(404).json({ success: false, message: 'Seller not found' });
       }
       const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
-      if (req.user?.user_type === 'manager' && managerId && seller.manager_id && seller.manager_id !== managerId) {
+      if (req.user?.user_type === 'manager' && managerId && seller.created_by_manager_id && seller.created_by_manager_id !== managerId) {
         return res.status(403).json({ success: false, message: 'Forbidden: seller not owned by manager' });
       }
 

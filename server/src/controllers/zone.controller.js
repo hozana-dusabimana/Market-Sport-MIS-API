@@ -1,5 +1,6 @@
 import db from '../config/database.js';
 import { Zone, Space } from '../models/Zone.model.js';
+import NotificationService from '../services/notificationService.js';
 
 class ZoneController {
   // Get all zones with filters
@@ -86,6 +87,12 @@ class ZoneController {
         status: status || 'active'
       });
 
+      // Auto-create notification
+      await NotificationService.createZoneNotification({
+        zone_id: zoneId,
+        zone_name
+      }, req.user?.user_id);
+
       res.status(201).json({
         success: true,
         message: 'Zone created successfully',
@@ -113,6 +120,9 @@ class ZoneController {
       if (!updated) {
         return res.status(500).json({ success: false, message: 'Failed to update zone' });
       }
+
+      // Auto-create notification
+      await NotificationService.updateZoneNotification(id, updates, req.user?.user_id);
 
       res.json({ success: true, message: 'Zone updated successfully' });
     } catch (error) {
@@ -169,6 +179,16 @@ class ZoneController {
   async getZoneStats(req, res) {
     try {
       const { id } = req.params;
+      // Verify zone ownership for managers before returning statistics
+      const zone = await Zone.findById(id);
+      if (!zone) {
+        return res.status(404).json({ success: false, message: 'Zone not found' });
+      }
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
+      if (req.user?.user_type === 'manager' && managerId && zone.manager_id !== managerId) {
+        return res.status(403).json({ success: false, message: 'Forbidden: zone not owned by manager' });
+      }
+
       const stats = await Zone.getStatistics(id);
 
       res.json({

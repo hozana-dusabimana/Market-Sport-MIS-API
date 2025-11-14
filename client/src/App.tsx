@@ -17,6 +17,7 @@ import ManagerSpaces from './pages/manager/Spaces'
 import ManagerAllocations from './pages/manager/Allocations'
 import ManagerPayments from './pages/manager/Payments'
 import ManagerReports from './pages/manager/Reports'
+import ManagerSeller from './pages/manager/Seller'
 import ManagerNotifications from './pages/manager/Notifications'
 import SellerRegistration from './pages/admin/SellerRegistration'
 import Sellers from './pages/admin/Sellers'
@@ -91,6 +92,7 @@ function App() {
             <Route path="payments" element={<ManagerPayments />} />
             <Route path="reports" element={<ManagerReports />} />
             <Route path="notifications" element={<ManagerNotifications />} />
+            <Route path="sellers" element={<ManagerSeller />} />
           </>
         )}
       </Route>

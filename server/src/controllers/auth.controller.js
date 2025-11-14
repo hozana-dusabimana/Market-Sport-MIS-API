@@ -4,6 +4,7 @@ import db from '../config/database.js';
 import config from '../config/config.js';
 import User from '../models/User.model.js';
 import Blacklist from '../models/Blacklist.model.js';
+import NotificationService from '../services/notificationService.js';
 
 class AuthController {
   // Register new user
@@ -94,16 +95,44 @@ class AuthController {
           profileId = managerResult.insertId;
           break;
         case 'seller':
+          // Accept optional manager_id from body (e.g., manager creating a seller from dashboard)
+          const creatorManagerId = req.body.manager_id || null;
           const [sellerResult] = await connection.query(
-            `INSERT INTO sellers (user_id, full_name, id_number, business_name, business_type, tin_number, emergency_contact, address, registration_date, verification_status) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
-            [userId, full_name || null, id_number, business_name || null, business_type || null, tin_number || null, emergency_contact || null, address || null, registration_date || new Date().toISOString().split('T')[0]]
+            `INSERT INTO sellers (user_id, full_name, id_number, business_name, business_type, created_by_manager_id, tin_number, emergency_contact, address, registration_date, verification_status) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+            [
+              userId,
+              full_name || null,
+              id_number,
+              business_name || null,
+              business_type || null,
+              creatorManagerId,
+              tin_number || null,
+              emergency_contact || null,
+              address || null,
+              registration_date || new Date().toISOString().split('T')[0]
+            ]
           );
           profileId = sellerResult.insertId;
+          // Best-effort mirror into sellers.manager_id if the column exists
+          if (creatorManagerId) {
+            try {
+              await connection.query('UPDATE sellers SET manager_id = ? WHERE seller_id = ?', [creatorManagerId, profileId]);
+            } catch (e) {
+              // Column may not exist; ignore silently
+            }
+          }
           break;
       }
 
       await connection.commit();
+
+      // Auto-create notification
+      await NotificationService.createUserNotification({
+        user_id: userId,
+        username,
+        user_type
+      }, null);
 
       const token = jwt.sign(
         { userId, username, user_type },

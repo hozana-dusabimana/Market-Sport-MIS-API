@@ -10,8 +10,8 @@ router.get('/user/notifications', authenticate, notificationController.getUserNo
 router.get('/unread/count', authenticate, notificationController.getUnreadCount.bind(notificationController));
 router.get('/:id', authenticate, notificationController.getNotificationById.bind(notificationController));
 
-// Create notification
-router.post('/', authenticate, notificationController.createNotification.bind(notificationController));
+// Manual notification creation disabled - notifications are auto-created
+// router.post('/', authenticate, notificationController.createNotification.bind(notificationController));
 
 // Update routes
 router.put('/:id', authenticate, notificationController.updateNotification.bind(notificationController));

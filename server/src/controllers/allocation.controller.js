@@ -1,6 +1,7 @@
 import db from '../config/database.js';
 import { Allocation } from '../models/Payment.model.js';
 import Space from '../models/Space.model.js';
+import NotificationService from '../services/notificationService.js';
 
 class AllocationController {
   // Get all allocations with filters
@@ -16,10 +17,10 @@ class AllocationController {
         offset: req.query.offset ? parseInt(req.query.offset) : 0
       };
 
-      // Auto-scope to manager's market when the requester is a manager
-      const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
+      // Auto-scope: managers see only allocations they created
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
       if (req.user?.user_type === 'manager' && managerId) {
-        filters.manager_id = managerId;
+        filters.created_by_manager_id = managerId;
       }
 
       const allocations = await Allocation.findAll(filters);
@@ -46,8 +47,8 @@ class AllocationController {
       }
 
       // Enforce ownership for managers (created-by-only)
-      const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
-      if (req.user?.user_type === 'manager' && managerId && allocation.manager_id !== managerId) {
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id;
+      if (req.user?.user_type === 'manager' && managerId && allocation.created_by_manager_id !== managerId) {
         return res.status(403).json({ success: false, message: 'Forbidden: allocation not owned by manager' });
       }
 
@@ -87,8 +88,8 @@ class AllocationController {
 
       // Get user_id from either user_id or userId (both formats supported)
       const approvedBy = req.user.user_id || req.user.userId;
-      // Determine manager_id (for manager users)
-      const managerId = req.user?.manager_id || req.user?.profile?.manager_id || null;
+      // Determine managerId (for manager users)
+      const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id || null;
 
       // Check for existing active allocation for this seller-space combination
       const existingAllocation = await Allocation.findActive(seller_id, space_id);
@@ -102,7 +103,7 @@ class AllocationController {
 
       // For managers: ensure the space belongs to a zone owned by the manager
       if (req.user?.user_type === 'manager') {
-        const managerId = req.user?.manager_id || req.user?.profile?.manager_id || null;
+        const managerId = req.user?.manager_id || req.user?.profile?.manager_id || req.user?.id || null;
         if (!managerId) {
           return res.status(403).json({ success: false, message: 'Forbidden: manager id missing' });
         }
@@ -124,10 +125,32 @@ class AllocationController {
         end_date,
         allocation_type,
         approved_by: approvedBy,
-        manager_id: req.user?.user_type === 'manager' ? managerId : null,
+        manager_id: null,
+        created_by_manager_id: req.user?.user_type === 'manager' ? managerId : null,
         notes: notes || null,
         status: 'active'
       });
+
+      // Get seller user_id for real-time updates
+      const [sellerRows] = await db.query('SELECT user_id FROM sellers WHERE seller_id = ?', [seller_id]);
+      const sellerUserId = sellerRows[0]?.user_id;
+
+      // Auto-create notification
+      await NotificationService.createAllocationNotification({
+        allocation_id: allocationId,
+        seller_id,
+        space_id
+      }, approvedBy);
+
+      // Real-time allocation update
+      if (sellerUserId) {
+        const socketService = (await import('../services/socketService.js')).default;
+        socketService.emitAllocationCreated(sellerUserId, {
+          allocation_id: allocationId,
+          space_id,
+          status: 'active'
+        });
+      }
 
       res.status(201).json({
         success: true,
@@ -153,7 +176,7 @@ class AllocationController {
 
       // Enforce ownership for managers
       const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
-      if (req.user?.user_type === 'manager' && managerId && allocation.manager_id !== managerId) {
+      if (req.user?.user_type === 'manager' && managerId && allocation.created_by_manager_id !== managerId) {
         return res.status(403).json({ success: false, message: 'Forbidden: allocation not owned by manager' });
       }
 
@@ -162,6 +185,9 @@ class AllocationController {
       if (!updated) {
         return res.status(500).json({ success: false, message: 'Failed to update allocation' });
       }
+
+      // Auto-create notification
+      await NotificationService.updateAllocationNotification(id, updates, req.user?.user_id);
 
       res.json({ success: true, message: 'Allocation updated successfully' });
     } catch (error) {
@@ -194,6 +220,9 @@ class AllocationController {
       if (!updated) {
         return res.status(404).json({ success: false, message: 'Allocation not found' });
       }
+
+      // Auto-create notification
+      await NotificationService.updateAllocationNotification(id, { status }, req.user?.user_id);
 
       res.json({ success: true, message: 'Allocation status updated successfully' });
     } catch (error) {

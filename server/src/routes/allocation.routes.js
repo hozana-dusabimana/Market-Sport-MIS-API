@@ -4,10 +4,10 @@ import { authenticate } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
-// Public routes
-router.get('/', allocationController.getAllAllocations.bind(allocationController));
-router.get('/:id', allocationController.getAllocationById.bind(allocationController));
-router.get('/:id/payments', allocationController.getPayments.bind(allocationController));
+// Authenticated routes (needed for manager scoping)
+router.get('/', authenticate, allocationController.getAllAllocations.bind(allocationController));
+router.get('/:id', authenticate, allocationController.getAllocationById.bind(allocationController));
+router.get('/:id/payments', authenticate, allocationController.getPayments.bind(allocationController));
 
 // Protected routes
 router.post('/', authenticate, allocationController.createAllocation.bind(allocationController));

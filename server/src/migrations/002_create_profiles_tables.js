@@ -39,6 +39,7 @@ export async function up(connection) {
       address TEXT,
       registration_date DATE NULL,
       verification_status ENUM('pending','verified','rejected') DEFAULT 'pending',
+      created_by_manager_id INT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);

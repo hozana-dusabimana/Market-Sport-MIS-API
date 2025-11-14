@@ -1,257 +1,188 @@
-// ============================================
-// Lanari Payment Integration Service
-// ============================================
-
-import https from 'https';
-import http from 'http';
+import axios from 'axios';
 
 class LanariPaymentService {
   constructor() {
-    // Lanari API Configuration
     this.apiUrl = 'https://www.lanari.rw/lanari_pay/api/payment/process.php';
-    this.apiKey = process.env.LANARI_API_KEY || '';
-    this.apiSecret = process.env.LANARI_API_SECRET || '';
-    this.timeout = 30000; // 30 seconds timeout
+    this.apiKey = 'da0209a4e5f3be1b932ba53b5bfc54d66033bd19b3277ef00a8106d4f41f30bf';
+    this.apiSecret = 'e723b314c53846ac7f3645d1a62398fad5039a25e9f7121fb84d561e0c52567bc5aa2f66cfe48f702485d999924858792c0e262439ff1c3eeedccf57c2790a4f';
   }
 
-  /**
-   * Process payment through Lanari API
-   * @param {Object} paymentData - Payment data
-   * @param {number} paymentData.amount - Amount in RWF
-   * @param {string} paymentData.customer_phone - Customer phone number (250788123456 format)
-   * @param {string} paymentData.description - Payment description
-   * @param {string} paymentData.currency - Currency code (default: RWF)
-   * @param {string} paymentData.reference_id - Optional: Your internal reference ID
-   * @returns {Promise<Object>} - Lanari API response
-   */
+  formatPhoneNumber(phone) {
+    let formattedPhone = String(phone || '').trim().replace(/\s+/g, '').replace(/^\+/, '');
+    
+    if (!formattedPhone) {
+      throw new Error('Phone number is empty after formatting');
+    }
+
+    // Convert 250 format to 0 format
+    if (formattedPhone.startsWith('250')) {
+      formattedPhone = '0' + formattedPhone.substring(3);
+    }
+
+    // Add 0 prefix if missing
+    if (!formattedPhone.startsWith('0')) {
+      if (formattedPhone.length === 9 || formattedPhone.length === 8) {
+        formattedPhone = '0' + formattedPhone;
+      }
+    }
+
+    // Validate format
+    if (!formattedPhone.match(/^0[789]\d{8}$/)) {
+      console.warn(`Phone number format may be incorrect: ${formattedPhone}`);
+    }
+
+    return formattedPhone;
+  }
+
   async processPayment(paymentData) {
     try {
-      const {
-        amount,
-        customer_phone,
-        description,
-        currency = 'RWF',
-        reference_id = `MKT-${Date.now()}`
-      } = paymentData;
+      const { amount, customer_phone, description, currency = 'RWF' } = paymentData;
 
-      // Validate required fields
-      if (!amount || !customer_phone || !description) {
-        throw new Error('Missing required fields: amount, customer_phone, description');
+      if (!amount || amount <= 0) {
+        throw new Error('Invalid payment amount');
       }
 
-      // Validate phone number format
-      if (!this.validatePhoneNumber(customer_phone)) {
-        throw new Error('Invalid phone number format. Expected: 250788123456');
+      if (!customer_phone) {
+        throw new Error('Customer phone number is required');
       }
 
-      // Validate amount
-      if (amount <= 0) {
-        throw new Error('Amount must be greater than 0');
-      }
+      const formattedPhone = this.formatPhoneNumber(customer_phone);
+      const cleanDescription = (description || 'Market Spot Payment')
+        .replace(/#/g, '')
+        .replace(/@/g, '')
+        .replace(/[^\w\s-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
 
-      // Prepare request payload
-      const payload = {
+      const requestData = {
         api_key: this.apiKey,
         api_secret: this.apiSecret,
-        amount: Math.round(amount), // Ensure integer
-        customer_phone: customer_phone,
-        currency: currency,
-        description: description,
-        reference_id: reference_id
+        amount: Math.round(amount),
+        customer_phone: formattedPhone,
+        currency,
+        description: cleanDescription
       };
 
-      console.log('🔄 Lanari Payment Request:', {
-        amount: payload.amount,
-        customer_phone: payload.customer_phone,
-        currency: payload.currency,
-        description: payload.description,
-        reference_id: payload.reference_id
+      console.log('[PAYMENT] Processing payment:', amount, 'RWF for', formattedPhone);
+
+      const response = await axios.post(this.apiUrl, requestData, {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        timeout: 180000, // 3 minutes for mobile money confirmation
+        transformResponse: [(data) => {
+          try {
+            return typeof data === 'string' ? JSON.parse(data) : data;
+          } catch (e) {
+            return { rawResponse: data, parseError: e.message };
+          }
+        }]
       });
 
-      // Make request to Lanari API using native HTTPS
-      let responseStatus, responseText, result;
+      const responseData = response.data;
+
+      // Handle parse errors
+      if (responseData?.parseError) {
+        return {
+          success: false,
+          error: 'Invalid JSON response from gateway',
+          data: responseData,
+          gatewayError: true
+        };
+      }
+
+      // Check for transaction ID/ref
+      const transactionId = responseData?.transaction_id ||
+        responseData?.transactionId ||
+        responseData?.transaction_ref ||
+        responseData?.txn_id;
+
+      const hasTransaction = !!transactionId;
+      const isSuccess = (
+        responseData?.status === 'success' ||
+        responseData?.success === true ||
+        (response.status === 200 && hasTransaction)
+      );
+
+      if (hasTransaction) {
+        console.log('✓ [PAYMENT] Payment successful. Transaction ID:', transactionId);
+        return {
+          success: true,
+          transaction_id: transactionId,
+          reference_id: responseData?.reference_id,
+          status: responseData?.status || 'success',
+          message: responseData?.message || 'Payment processed successfully',
+          raw_response: responseData
+        };
+      }
+
+      if (isSuccess) {
+        return {
+          success: true,
+          transaction_id: 'pending',
+          status: 'pending',
+          message: responseData?.message || 'Payment is being processed',
+          raw_response: responseData
+        };
+      }
+
+      // Payment failed
+      const errorMessage = responseData?.error ||
+        responseData?.message ||
+        'Payment processing failed';
+
+      return {
+        success: false,
+        error: errorMessage,
+        status: responseData?.status || 'failed',
+        raw_response: responseData
+      };
+
+    } catch (error) {
+      console.error('✗ [PAYMENT] Payment error:', error.message);
       
-      try {
-        const response = await new Promise((resolve, reject) => {
-          const options = {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Content-Length': JSON.stringify(payload).length
-            },
-            timeout: this.timeout,
-            rejectUnauthorized: false // For testing only
-          };
-
-          console.log('🚀 Sending request to Lanari API');
-          const req = https.request(this.apiUrl, options, (res) => {
-            let data = '';
-            res.on('data', chunk => {
-              data += chunk;
-            });
-            res.on('end', () => {
-              resolve({
-                statusCode: res.statusCode,
-                statusMessage: res.statusMessage,
-                body: data
-              });
-            });
-          });
-
-          req.on('error', (error) => {
-            console.error('❌ HTTPS Error:', error.message);
-            reject(new Error(`HTTPS request failed: ${error.message}`));
-          });
-
-          req.on('timeout', () => {
-            req.destroy();
-            reject(new Error('Request timeout after ' + this.timeout + 'ms'));
-          });
-
-          req.write(JSON.stringify(payload));
-          req.end();
-        });
-
-        responseStatus = response.statusCode;
-        responseText = response.body;
-        console.log(`📊 Lanari Response (Status ${responseStatus}):`, responseText.substring(0, 300));
-        
-        try {
-          result = JSON.parse(responseText);
-        } catch (e) {
-          console.error('❌ Failed to parse Lanari response:', responseText);
-          throw new Error(`Invalid JSON response from Lanari: ${responseText.substring(0, 200)}`);
-        }
-      } catch (fetchError) {
-        console.error('❌ Lanari API Connection Error:', fetchError.message);
-        throw new Error(`Failed to connect to Lanari API: ${fetchError.message}`);
+      if (error.response) {
+        const errorData = error.response.data;
+        return {
+          success: false,
+          error: errorData?.message || `Payment API error (${error.response.status})`,
+          statusCode: error.response.status,
+          raw_response: errorData
+        };
       }
-
-      // Check if response indicates error
-      if (responseStatus >= 400 || !result.success) {
-        const errorMsg = result.message || result.error || `API returned status ${responseStatus}`;
-        throw new Error(`Lanari API error: ${errorMsg}`);
+      
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        return {
+          success: false,
+          error: 'Payment request timed out. Please try again.',
+          timeout: true
+        };
       }
-
-      // Validate response
-      if (!result) {
-        throw new Error('Empty response from Lanari API');
-      }
-
-      // Extract transaction ID from various possible locations
-      const transactionId = result.transaction_id || 
-                           result.transaction_ref || 
-                           result.gateway_response?.data?.transaction_id ||
-                           result.id;
-
-      // Return structured response
+      
       return {
-        success: result.success || result.status === 'success',
-        transaction_id: transactionId,
-        reference_id: reference_id,
-        status: result.status || (result.success ? 'pending' : 'failed'),
-        message: result.message || 'Payment processed',
-        raw_response: result
+        success: false,
+        error: error.message || 'Payment service unavailable',
+        networkError: true
       };
-    } catch (error) {
-      console.error('❌ Lanari Payment Error:', error.message);
-      throw new Error(`Payment processing failed: ${error.message}`);
     }
   }
 
-  /**
-   * Check payment status (if Lanari API supports it)
-   * @param {string} transaction_id - Transaction ID from Lanari
-   * @returns {Promise<Object>} - Payment status
-   */
-  async checkPaymentStatus(transaction_id) {
-    try {
-      if (!transaction_id) {
-        throw new Error('Transaction ID is required');
-      }
-
-      // Note: This is a placeholder for status check
-      // Actual implementation depends on Lanari API capabilities
-      console.log('🔍 Checking payment status for:', transaction_id);
-
-      // Placeholder response
-      return {
-        transaction_id: transaction_id,
-        status: 'pending',
-        message: 'Status check feature coming soon'
-      };
-    } catch (error) {
-      console.error('❌ Status Check Error:', error.message);
-      throw error;
-    }
+  // Market-specific payment methods
+  async processSpacePayment(phone, amount, spaceName, sellerName) {
+    return await this.processPayment({
+      amount,
+      customer_phone: phone,
+      description: `Space payment for ${spaceName} - ${sellerName}`
+    });
   }
 
-  /**
-   * Validate phone number format
-   * @param {string} phoneNumber - Phone number to validate
-   * @returns {boolean} - True if valid
-   */
-  validatePhoneNumber(phoneNumber) {
-    // Rwanda phone number format: 250788123456 (12 digits starting with 250)
-    const phoneRegex = /^250\d{9}$/;
-    return phoneRegex.test(phoneNumber);
-  }
-
-  /**
-   * Format phone number to Lanari format
-   * @param {string} phoneNumber - Phone number in any format
-   * @returns {string} - Formatted phone number (250788123456)
-   */
-  formatPhoneNumber(phoneNumber) {
-    // Remove any non-digit characters
-    const cleaned = phoneNumber.replace(/\D/g, '');
-
-    // If starts with 0, replace with 250
-    if (cleaned.startsWith('0')) {
-      return '250' + cleaned.substring(1);
-    }
-
-    // If already has country code, return as is
-    if (cleaned.startsWith('250')) {
-      return cleaned;
-    }
-
-    // If 10 digits (local format), add 250
-    if (cleaned.length === 10) {
-      return '250' + cleaned;
-    }
-
-    // Return as is if we can't determine format
-    return cleaned;
-  }
-
-  /**
-   * Initialize payment webhook listener (for future use)
-   * Note: You'll need to configure webhook URL in Lanari dashboard
-   */
-  async handleWebhook(webhookData) {
-    try {
-      console.log('📥 Lanari Webhook Received:', webhookData);
-
-      // Verify webhook signature if Lanari provides one
-      // Placeholder for actual verification logic
-      const isValid = true; // Implement verification here
-
-      if (!isValid) {
-        throw new Error('Invalid webhook signature');
-      }
-
-      return {
-        success: true,
-        message: 'Webhook processed successfully',
-        transaction_id: webhookData.transaction_id
-      };
-    } catch (error) {
-      console.error('❌ Webhook Processing Error:', error.message);
-      throw error;
-    }
+  async processRegistrationFee(phone, amount, sellerName) {
+    return await this.processPayment({
+      amount,
+      customer_phone: phone,
+      description: `Registration fee - ${sellerName}`
+    });
   }
 }
 
-// Export singleton instance
 export default new LanariPaymentService();

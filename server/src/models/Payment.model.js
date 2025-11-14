@@ -13,7 +13,8 @@ class Allocation {
         sp.space_number,
         sp.space_type,
         z.zone_name,
-        z.zone_code
+        z.zone_code,
+        z.manager_id AS manager_id
       FROM space_allocations sa
       JOIN sellers s ON sa.seller_id = s.seller_id
       JOIN spaces sp ON sa.space_id = sp.space_id
@@ -37,9 +38,13 @@ class Allocation {
       values.push(filters.zone_id);
     }
 
-    if (filters.manager_id) {
-      // Strict: only allocations created by this manager
-      query += ' AND sa.manager_id = ?';
+    if (filters.created_by_manager_id) {
+      // Strictly show allocations created by the manager
+      query += ' AND sa.created_by_manager_id = ?';
+      values.push(filters.created_by_manager_id);
+    } else if (filters.manager_id) {
+      // Fallback: scope by zone ownership
+      query += ' AND z.manager_id = ?';
       values.push(filters.manager_id);
     }
 
@@ -77,7 +82,8 @@ class Allocation {
         sp.weekly_rate,
         sp.monthly_rate,
         z.zone_name,
-        z.zone_code
+        z.zone_code,
+        z.manager_id AS manager_id
       FROM space_allocations sa
       JOIN sellers s ON sa.seller_id = s.seller_id
       JOIN users u ON s.user_id = u.user_id
@@ -117,12 +123,14 @@ class Allocation {
       status = 'active'
     } = allocationData;
 
+    const created_by_manager_id = manager_id || allocationData.created_by_manager_id || null;
+
     const [result] = await db.query(
       `INSERT INTO space_allocations 
-       (seller_id, space_id, manager_id, allocation_date, start_date, end_date, 
+       (seller_id, space_id, created_by_manager_id, allocation_date, start_date, end_date, 
         allocation_type, status, approved_by, notes)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [seller_id, space_id, manager_id || null, allocation_date, start_date, end_date,
+      [seller_id, space_id, created_by_manager_id, allocation_date, start_date, end_date,
        allocation_type, status, approved_by, notes]
     );
 
@@ -285,7 +293,7 @@ class Payment {
         sp.space_number,
         z.zone_name,
         sa.allocation_type,
-        sa.manager_id as manager_id
+        z.manager_id as manager_id
       FROM payments p
       JOIN sellers s ON p.seller_id = s.seller_id
       JOIN space_allocations sa ON p.allocation_id = sa.allocation_id
@@ -310,14 +318,18 @@ class Payment {
       values.push(filters.status);
     }
 
-    if (filters.payment_method) {
-      query += ' AND p.payment_method = ?';
-      values.push(filters.payment_method);
+    if (filters.zone_id) {
+      query += ' AND sp.zone_id = ?';
+      values.push(filters.zone_id);
     }
 
-    if (filters.manager_id) {
-      // Strict: only payments for allocations created by this manager
-      query += ' AND sa.manager_id = ?';
+    if (filters.created_by_manager_id) {
+      // Strict scoping: only allocations created by this manager
+      query += ' AND sa.created_by_manager_id = ?';
+      values.push(filters.created_by_manager_id);
+    } else if (filters.manager_id) {
+      // Fallback: scope by zone ownership
+      query += ' AND z.manager_id = ?';
       values.push(filters.manager_id);
     }
 
@@ -353,7 +365,7 @@ class Payment {
         z.zone_name,
         z.zone_code,
         sa.allocation_type,
-        sa.manager_id as manager_id
+        z.manager_id as manager_id
       FROM payments p
       JOIN sellers s ON p.seller_id = s.seller_id
       JOIN users u ON s.user_id = u.user_id

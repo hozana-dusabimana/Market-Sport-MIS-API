@@ -10,6 +10,8 @@ export async function up(connection) {
         allocation_type ENUM('daily', 'weekly', 'monthly', 'permanent', 'temporary') NOT NULL,
         status ENUM('active', 'expired', 'cancelled') DEFAULT 'active',
         approved_by INT,
+        manager_id INT NULL,
+        created_by_manager_id INT NULL,
         notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (seller_id) REFERENCES sellers(seller_id) ON DELETE CASCADE,
