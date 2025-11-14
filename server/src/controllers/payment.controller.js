@@ -126,6 +126,10 @@ class PaymentController {
         notes
       });
 
+      // Get seller user_id for real-time updates
+      const [sellerRows] = await db.query('SELECT user_id FROM sellers WHERE seller_id = ?', [seller_id]);
+      const sellerUserId = sellerRows[0]?.user_id;
+
       // Auto-create notification
       await NotificationService.createPaymentNotification({
         payment_id: paymentId,
@@ -134,6 +138,17 @@ class PaymentController {
         amount,
         status: 'completed'
       }, req.user?.user_id);
+
+      // Real-time payment update
+      if (sellerUserId) {
+        const socketService = (await import('../services/socketService.js')).default;
+        socketService.emitPaymentCreated(sellerUserId, {
+          payment_id: paymentId,
+          amount,
+          status: 'completed',
+          payment_method
+        });
+      }
 
       res.status(201).json({
         success: true,
@@ -213,8 +228,10 @@ class PaymentController {
         reference_id: `MKTS-${seller_id}-${allocation_id}-${Date.now()}`
       });
 
-      // Save payment record to database
-      const paymentStatus = lanariResponse.success ? 'pending' : 'failed';
+      // Check gateway response for immediate success
+      const gatewaySuccess = lanariResponse.raw_response?.gateway_response?.data?.status === 'SUCCESSFUL';
+      const paymentStatus = gatewaySuccess ? 'completed' : (lanariResponse.success ? 'pending' : 'failed');
+      
       const paymentId = await Payment.create({
         allocation_id,
         seller_id,
@@ -232,6 +249,10 @@ class PaymentController {
         notes: notes || `Lanari Payment - ${lanariResponse.status}`
       });
 
+      // Get seller user_id for real-time updates
+      const [sellerRows] = await db.query('SELECT user_id FROM sellers WHERE seller_id = ?', [seller_id]);
+      const sellerUserId = sellerRows[0]?.user_id;
+
       // Auto-create notification
       await NotificationService.createPaymentNotification({
         payment_id: paymentId,
@@ -241,14 +262,40 @@ class PaymentController {
         status: paymentStatus
       }, req.user?.user_id);
 
+      // Real-time payment update
+      if (sellerUserId) {
+        const socketService = (await import('../services/socketService.js')).default;
+        if (paymentStatus === 'completed') {
+          socketService.emitPaymentCompleted(sellerUserId, {
+            payment_id: paymentId,
+            amount,
+            status: 'completed',
+            transaction_id: lanariResponse.transaction_id
+          });
+        } else if (paymentStatus === 'pending') {
+          socketService.emitPaymentCreated(sellerUserId, {
+            payment_id: paymentId,
+            amount,
+            status: 'pending',
+            transaction_id: lanariResponse.transaction_id
+          });
+        } else {
+          socketService.emitPaymentFailed(sellerUserId, {
+            payment_id: paymentId,
+            amount,
+            error: lanariResponse.error || 'Payment failed'
+          });
+        }
+      }
+
       res.status(201).json({
         success: true,
-        message: 'Payment processed via Lanari',
+        message: paymentStatus === 'completed' ? 'Payment completed successfully' : 'Payment processed via Lanari',
         data: {
           payment_id: paymentId,
           transaction_id: lanariResponse.transaction_id,
           reference_id: lanariResponse.reference_id,
-          status: lanariResponse.success ? 'pending' : 'failed',
+          status: paymentStatus,
           lanari_response: lanariResponse.raw_response
         }
       });
@@ -262,117 +309,7 @@ class PaymentController {
     }
   }
 
-  // Process payment via Lanari with automatic confirmation
-  async processLanariPaymentAuto(req, res) {
-    try {
-      const {
-        allocation_id,
-        seller_id,
-        amount,
-        customer_phone,
-        payment_period_start,
-        payment_period_end,
-        notes
-      } = req.body;
 
-      // Validate required fields
-      if (!allocation_id || !seller_id || !amount || !customer_phone) {
-        return res.status(400).json({
-          success: false,
-          message: 'Allocation ID, Seller ID, Amount, and Customer Phone are required'
-        });
-      }
-
-      // Verify allocation exists
-      const [allocation] = await db.query(
-        'SELECT * FROM space_allocations WHERE allocation_id = ? AND seller_id = ?',
-        [allocation_id, seller_id]
-      );
-
-      if (!allocation || allocation.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: 'Allocation not found'
-        });
-      }
-
-      // For managers: enforce allocation ownership
-      if (req.user?.user_type === 'manager') {
-        const managerId = req.user?.manager_id || req.user?.profile?.manager_id;
-        if (!managerId) {
-          return res.status(403).json({ success: false, message: 'Forbidden: manager id missing' });
-        }
-        const [allocRows] = await db.query(
-          'SELECT manager_id FROM space_allocations WHERE allocation_id = ? AND seller_id = ? LIMIT 1',
-          [allocation_id, seller_id]
-        );
-        const allocManagerId = allocRows?.[0]?.manager_id;
-        if (!allocManagerId || allocManagerId !== managerId) {
-          return res.status(403).json({ success: false, message: 'Forbidden: cannot process payment for another manager\'s allocation' });
-        }
-      }
-
-      // Format phone number
-      const formattedPhone = lanariPaymentService.formatPhoneNumber(customer_phone);
-
-      // Call Lanari API
-      const lanariResponse = await lanariPaymentService.processPayment({
-        amount: Math.round(amount),
-        customer_phone: formattedPhone,
-        description: `Market Spot Payment - Allocation #${allocation_id}`,
-        currency: 'RWF'
-      });
-
-      // Determine status based on Lanari response
-      const paymentStatus = lanariResponse.success ? 'completed' : 'failed';
-
-      // Save payment record
-      const paymentId = await Payment.create({
-        allocation_id,
-        seller_id,
-        amount,
-        payment_date: new Date(),
-        payment_method: 'lanari_mobile_money',
-        payment_reference: lanariResponse.reference_id,
-        payment_period_start,
-        payment_period_end,
-        status: paymentStatus,
-        processed_by: req.user?.user_id,
-        mobile_money_number: formattedPhone,
-        mobile_money_provider: 'lanari',
-        transaction_id: lanariResponse.transaction_id,
-        notes: notes || `Lanari Auto Payment - ${lanariResponse.status}`
-      });
-
-      // Auto-create notification
-      await NotificationService.createPaymentNotification({
-        payment_id: paymentId,
-        allocation_id,
-        seller_id,
-        amount,
-        status: paymentStatus
-      }, req.user?.user_id);
-
-      res.status(201).json({
-        success: lanariResponse.success,
-        message: lanariResponse.success ? 'Payment completed successfully' : 'Payment failed',
-        data: {
-          payment_id: paymentId,
-          transaction_id: lanariResponse.transaction_id,
-          status: paymentStatus,
-          amount_paid: amount,
-          customer_phone: formattedPhone
-        }
-      });
-    } catch (error) {
-      console.error('Lanari auto payment error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to process Lanari payment',
-        error: error.message
-      });
-    }
-  }
 
   // Update payment
   async updatePayment(req, res) {
@@ -445,8 +382,37 @@ class PaymentController {
         return res.status(404).json({ success: false, message: 'Payment not found' });
       }
 
+      // Get seller user_id for real-time updates
+      const [sellerRows] = await db.query(`
+        SELECT s.user_id FROM sellers s
+        JOIN payments p ON s.seller_id = p.seller_id
+        WHERE p.payment_id = ?
+      `, [id]);
+      const sellerUserId = sellerRows[0]?.user_id;
+
       // Auto-create notification
       await NotificationService.updatePaymentNotification(id, { status }, req.user?.user_id);
+
+      // Real-time status update
+      if (sellerUserId) {
+        const socketService = (await import('../services/socketService.js')).default;
+        if (status === 'completed') {
+          socketService.emitPaymentCompleted(sellerUserId, {
+            payment_id: id,
+            status: 'completed'
+          });
+        } else if (status === 'failed') {
+          socketService.emitPaymentFailed(sellerUserId, {
+            payment_id: id,
+            status: 'failed'
+          });
+        } else {
+          socketService.emitPaymentUpdated(sellerUserId, {
+            payment_id: id,
+            status
+          });
+        }
+      }
 
       res.json({ success: true, message: 'Payment status updated successfully' });
     } catch (error) {
@@ -516,6 +482,88 @@ class PaymentController {
       res.status(500).json({ success: false, message: 'Failed to fetch revenue by method', error: error.message });
     }
   }
+
+  // Check payment status
+  async checkPaymentStatus(req, res) {
+    try {
+      const { id } = req.params;
+      const payment = await Payment.findById(id);
+
+      if (!payment) {
+        return res.status(404).json({ success: false, message: 'Payment not found' });
+      }
+
+      res.json({
+        success: true,
+        data: {
+          payment_id: id,
+          status: payment.status,
+          amount: payment.amount,
+          transaction_id: payment.transaction_id,
+          payment_date: payment.payment_date
+        }
+      });
+    } catch (error) {
+      console.error('Check payment status error:', error);
+      res.status(500).json({ success: false, message: 'Failed to check payment status', error: error.message });
+    }
+  }
+
+  // Confirm payment manually
+  async confirmPayment(req, res) {
+    try {
+      const { id } = req.params;
+      const payment = await Payment.findById(id);
+
+      if (!payment) {
+        return res.status(404).json({ success: false, message: 'Payment not found' });
+      }
+
+      if (payment.status === 'completed') {
+        return res.json({ success: true, message: 'Payment already confirmed' });
+      }
+
+      // Update payment status to completed
+      const updated = await Payment.updateStatus(id, 'completed');
+
+      if (!updated) {
+        return res.status(500).json({ success: false, message: 'Failed to confirm payment' });
+      }
+
+      // Get seller user_id for real-time updates
+      const [sellerRows] = await db.query(`
+        SELECT s.user_id FROM sellers s
+        JOIN payments p ON s.seller_id = p.seller_id
+        WHERE p.payment_id = ?
+      `, [id]);
+      const sellerUserId = sellerRows[0]?.user_id;
+
+      // Real-time notification
+      if (sellerUserId) {
+        const socketService = (await import('../services/socketService.js')).default;
+        socketService.emitPaymentCompleted(sellerUserId, {
+          payment_id: id,
+          status: 'completed',
+          amount: payment.amount
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Payment confirmed successfully',
+        data: {
+          payment_id: id,
+          status: 'completed',
+          amount: payment.amount
+        }
+      });
+    } catch (error) {
+      console.error('Confirm payment error:', error);
+      res.status(500).json({ success: false, message: 'Failed to confirm payment', error: error.message });
+    }
+  }
+
+  
 }
 
 export default new PaymentController();

@@ -14,7 +14,7 @@ class NotificationService {
       
       if (sellerRows[0] && spaceRows[0]) {
         const spaceName = spaceRows[0].space_name || `Space ${spaceRows[0].space_number}`;
-        await Notification.create({
+        const notificationId = await Notification.create({
           user_id: sellerRows[0].user_id,
           seller_id,
           title: 'New Space Allocation',
@@ -22,6 +22,15 @@ class NotificationService {
           notification_type: 'allocation',
           related_id: allocation_id,
           action_url: `/allocations/${allocation_id}`
+        });
+
+        // Real-time notification
+        const socketService = (await import('./socketService.js')).default;
+        socketService.emitNotification(sellerRows[0].user_id, {
+          notification_id: notificationId,
+          title: 'New Space Allocation',
+          message: `You have been allocated ${spaceName} in zone "${zoneRows[0]?.zone_name}".`,
+          type: 'allocation'
         });
       }
     } catch (error) {
