@@ -4,11 +4,19 @@ import { authenticate } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
-// Reports (authenticated to derive manager scope)
-router.get('/overview', authenticate, reportController.getOverview.bind(reportController));
-router.get('/payments', authenticate, reportController.getPaymentsReport.bind(reportController));
-router.get('/allocations', authenticate, reportController.getAllocationsReport.bind(reportController));
-router.get('/spaces', authenticate, reportController.getSpacesReport.bind(reportController));
+// All report routes require authentication
+router.use(authenticate);
+
+// Generate/Fetch report routes - Changed to GET with query parameters
+router.get('/generate/daily', reportController.generateDailyReport);
+router.get('/generate/weekly', reportController.generateWeeklyReport);
+router.get('/generate/monthly', reportController.generateMonthlyReport);
+router.get('/generate/occupancy', reportController.generateOccupancyReport);
+router.get('/generate/revenue', reportController.generateRevenueReport);
+router.get('/generate/seller', reportController.generateSellerReport);
+
+// Statistics and summary routes (GET requests with query params)
+router.get('/statistics/zones', reportController.getZoneStatistics);
+router.get('/statistics/allocations', reportController.getAllocationSummary);
 
 export default router;
-

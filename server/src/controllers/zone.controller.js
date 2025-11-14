@@ -1,5 +1,6 @@
 import db from '../config/database.js';
 import { Zone, Space } from '../models/Zone.model.js';
+import NotificationService from '../services/notificationService.js';
 
 class ZoneController {
   // Get all zones with filters
@@ -86,6 +87,12 @@ class ZoneController {
         status: status || 'active'
       });
 
+      // Auto-create notification
+      await NotificationService.createZoneNotification({
+        zone_id: zoneId,
+        zone_name
+      }, req.user?.user_id);
+
       res.status(201).json({
         success: true,
         message: 'Zone created successfully',
@@ -113,6 +120,9 @@ class ZoneController {
       if (!updated) {
         return res.status(500).json({ success: false, message: 'Failed to update zone' });
       }
+
+      // Auto-create notification
+      await NotificationService.updateZoneNotification(id, updates, req.user?.user_id);
 
       res.json({ success: true, message: 'Zone updated successfully' });
     } catch (error) {

@@ -1,6 +1,7 @@
 import db from '../config/database.js';
 import { Zone } from '../models/Zone.model.js';
 import Space from '../models/Space.model.js';
+import NotificationService from '../services/notificationService.js';
 
 class SpaceController {
   // Get all spaces
@@ -69,6 +70,12 @@ class SpaceController {
         status: status || 'available'
       });
 
+
+      // Auto-create notification
+      await NotificationService.createSpaceNotification({
+        space_id: spaceId,
+        zone_id
+      }, req.user?.user_id);
 
       res.status(201).json({
         success: true,

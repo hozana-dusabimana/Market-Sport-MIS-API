@@ -1,7 +1,8 @@
 import db from '../config/database.js';
 import User from '../models/User.model.js';
 import bcrypt from 'bcryptjs';
-import config from '../config/config.js'; // Adjust if config structure differs
+import config from '../config/config.js';
+import NotificationService from '../services/notificationService.js';
 
 class UserController {
   // Get all users with filters (for admins/managers)
@@ -210,6 +211,13 @@ async getAllUsers(req, res) {
 
       await connection.commit();
 
+      // Auto-create notification
+      await NotificationService.createUserNotification({
+        user_id: userId,
+        username,
+        user_type
+      }, req.user?.user_id);
+
       res.status(201).json({
         success: true,
         message: 'User created successfully',
@@ -383,6 +391,11 @@ async updateUser(req, res) {
 
     await connection.commit();
 
+    // Auto-create notification if there were changes
+    if (updated) {
+      await NotificationService.updateUserNotification(userId, { ...userUpdate, ...profileUpdate }, req.user?.user_id);
+    }
+
     res.json({
       success: true,
       message: updated ? 'User updated successfully' : 'No changes made'
@@ -416,6 +429,9 @@ async updateUser(req, res) {
       if (!updated) {
         return res.status(404).json({ success: false, message: 'User not found or no change' });
       }
+
+      // Auto-create notification
+      await NotificationService.updateUserNotification(id, { status }, req.user?.user_id);
 
       res.json({ success: true, message: `User status updated to ${status}` });
     } catch (error) {

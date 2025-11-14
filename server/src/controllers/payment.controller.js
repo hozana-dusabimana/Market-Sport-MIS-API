@@ -1,6 +1,7 @@
 import db from '../config/database.js';
 import { Payment } from '../models/Payment.model.js';
 import lanariPaymentService from '../services/lanariPaymentService.js';
+import NotificationService from '../services/notificationService.js';
 
 class PaymentController {
   // Get all payments with filters
@@ -125,6 +126,15 @@ class PaymentController {
         notes
       });
 
+      // Auto-create notification
+      await NotificationService.createPaymentNotification({
+        payment_id: paymentId,
+        allocation_id,
+        seller_id,
+        amount,
+        status: 'completed'
+      }, req.user?.user_id);
+
       res.status(201).json({
         success: true,
         message: 'Payment created successfully',
@@ -204,6 +214,7 @@ class PaymentController {
       });
 
       // Save payment record to database
+      const paymentStatus = lanariResponse.success ? 'pending' : 'failed';
       const paymentId = await Payment.create({
         allocation_id,
         seller_id,
@@ -213,13 +224,22 @@ class PaymentController {
         payment_reference: lanariResponse.reference_id,
         payment_period_start,
         payment_period_end,
-        status: lanariResponse.success ? 'pending' : 'failed',
+        status: paymentStatus,
         processed_by: req.user?.user_id,
         mobile_money_number: formattedPhone,
         mobile_money_provider: 'lanari',
         transaction_id: lanariResponse.transaction_id,
         notes: notes || `Lanari Payment - ${lanariResponse.status}`
       });
+
+      // Auto-create notification
+      await NotificationService.createPaymentNotification({
+        payment_id: paymentId,
+        allocation_id,
+        seller_id,
+        amount,
+        status: paymentStatus
+      }, req.user?.user_id);
 
       res.status(201).json({
         success: true,
@@ -324,6 +344,15 @@ class PaymentController {
         notes: notes || `Lanari Auto Payment - ${lanariResponse.status}`
       });
 
+      // Auto-create notification
+      await NotificationService.createPaymentNotification({
+        payment_id: paymentId,
+        allocation_id,
+        seller_id,
+        amount,
+        status: paymentStatus
+      }, req.user?.user_id);
+
       res.status(201).json({
         success: lanariResponse.success,
         message: lanariResponse.success ? 'Payment completed successfully' : 'Payment failed',
@@ -380,6 +409,9 @@ class PaymentController {
         return res.status(500).json({ success: false, message: 'Failed to update payment' });
       }
 
+      // Auto-create notification
+      await NotificationService.updatePaymentNotification(id, updates, req.user?.user_id);
+
       res.json({ success: true, message: 'Payment updated successfully' });
     } catch (error) {
       console.error('Update payment error:', error);
@@ -412,6 +444,9 @@ class PaymentController {
       if (!updated) {
         return res.status(404).json({ success: false, message: 'Payment not found' });
       }
+
+      // Auto-create notification
+      await NotificationService.updatePaymentNotification(id, { status }, req.user?.user_id);
 
       res.json({ success: true, message: 'Payment status updated successfully' });
     } catch (error) {
