@@ -314,7 +314,7 @@ class Payment {
     }
 
     if (filters.status) {
-      query += ' AND sa.status = ?';
+      query += ' AND p.status = ?';
       values.push(filters.status);
     }
 

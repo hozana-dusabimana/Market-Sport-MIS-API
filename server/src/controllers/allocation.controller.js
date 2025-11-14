@@ -131,12 +131,26 @@ class AllocationController {
         status: 'active'
       });
 
+      // Get seller user_id for real-time updates
+      const [sellerRows] = await db.query('SELECT user_id FROM sellers WHERE seller_id = ?', [seller_id]);
+      const sellerUserId = sellerRows[0]?.user_id;
+
       // Auto-create notification
       await NotificationService.createAllocationNotification({
         allocation_id: allocationId,
         seller_id,
         space_id
       }, approvedBy);
+
+      // Real-time allocation update
+      if (sellerUserId) {
+        const socketService = (await import('../services/socketService.js')).default;
+        socketService.emitAllocationCreated(sellerUserId, {
+          allocation_id: allocationId,
+          space_id,
+          status: 'active'
+        });
+      }
 
       res.status(201).json({
         success: true,

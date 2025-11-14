@@ -10,29 +10,29 @@ class Report {
   static async getDailySummary(date, zoneId = null) {
     let query = `
       SELECT 
-        DATE(sa.start_date) as report_date,
+        ? as report_date,
         z.zone_id,
         z.zone_name,
         COUNT(DISTINCT sp.space_id) as total_spaces,
-        COUNT(DISTINCT CASE WHEN sa.allocation_id IS NOT NULL THEN sp.space_id END) as occupied_spaces,
-        ROUND((COUNT(DISTINCT CASE WHEN sa.allocation_id IS NOT NULL THEN sp.space_id END) / COUNT(DISTINCT sp.space_id)) * 100, 2) as occupancy_rate,
-        SUM(CASE WHEN p.status = 'completed' THEN p.amount ELSE 0 END) as total_revenue,
-        COUNT(DISTINCT p.payment_id) as total_payments
+        COUNT(DISTINCT CASE WHEN sa.allocation_id IS NOT NULL AND DATE(sa.start_date) = ? THEN sp.space_id END) as occupied_spaces,
+        ROUND((COUNT(DISTINCT CASE WHEN sa.allocation_id IS NOT NULL AND DATE(sa.start_date) = ? THEN sp.space_id END) / NULLIF(COUNT(DISTINCT sp.space_id), 0)) * 100, 2) as occupancy_rate,
+        COALESCE(SUM(CASE WHEN p.status = 'completed' AND DATE(p.payment_date) = ? THEN p.amount ELSE 0 END), 0) as total_revenue,
+        COUNT(DISTINCT CASE WHEN DATE(p.payment_date) = ? THEN p.payment_id END) as total_payments
       FROM zones z
       JOIN spaces sp ON z.zone_id = sp.zone_id
-      LEFT JOIN space_allocations sa ON sp.space_id = sa.space_id AND DATE(sa.start_date) = ?
-      LEFT JOIN payments p ON sa.allocation_id = p.allocation_id AND DATE(p.payment_date) = ?
+      LEFT JOIN space_allocations sa ON sp.space_id = sa.space_id
+      LEFT JOIN payments p ON sa.allocation_id = p.allocation_id
       WHERE 1=1
     `;
     
-    const values = [date, date];
+    const values = [date, date, date, date, date];
 
     if (zoneId) {
       query += ' AND z.zone_id = ?';
       values.push(zoneId);
     }
 
-    query += ' GROUP BY z.zone_id ORDER BY z.zone_name';
+    query += ' GROUP BY z.zone_id HAVING (occupied_spaces > 0 OR total_payments > 0 OR total_revenue > 0) ORDER BY z.zone_name';
 
     const [rows] = await db.query(query, values);
     return rows;
@@ -83,27 +83,27 @@ class Report {
         z.zone_id,
         z.zone_name,
         COUNT(DISTINCT sp.space_id) as total_spaces,
-        COUNT(DISTINCT CASE WHEN sa.allocation_id IS NOT NULL THEN sp.space_id END) as occupied_spaces,
-        ROUND((COUNT(DISTINCT CASE WHEN sa.allocation_id IS NOT NULL THEN sp.space_id END) / COUNT(DISTINCT sp.space_id)) * 100, 2) as occupancy_rate,
-        SUM(CASE WHEN p.status = 'completed' THEN p.amount ELSE 0 END) as total_revenue,
-        COUNT(DISTINCT p.payment_id) as total_payments,
-        COUNT(DISTINCT s.seller_id) as unique_sellers
+        COUNT(DISTINCT CASE WHEN sa.allocation_id IS NOT NULL AND sa.start_date BETWEEN ? AND ? THEN sp.space_id END) as occupied_spaces,
+        ROUND((COUNT(DISTINCT CASE WHEN sa.allocation_id IS NOT NULL AND sa.start_date BETWEEN ? AND ? THEN sp.space_id END) / NULLIF(COUNT(DISTINCT sp.space_id), 0)) * 100, 2) as occupancy_rate,
+        COALESCE(SUM(CASE WHEN p.status = 'completed' AND p.payment_date BETWEEN ? AND ? THEN p.amount ELSE 0 END), 0) as total_revenue,
+        COUNT(DISTINCT CASE WHEN p.payment_date BETWEEN ? AND ? THEN p.payment_id END) as total_payments,
+        COUNT(DISTINCT CASE WHEN sa.start_date BETWEEN ? AND ? THEN s.seller_id END) as unique_sellers
       FROM zones z
       JOIN spaces sp ON z.zone_id = sp.zone_id
-      LEFT JOIN space_allocations sa ON sp.space_id = sa.space_id AND sa.start_date BETWEEN ? AND ?
+      LEFT JOIN space_allocations sa ON sp.space_id = sa.space_id
       LEFT JOIN sellers s ON sa.seller_id = s.seller_id
-      LEFT JOIN payments p ON sa.allocation_id = p.allocation_id AND p.payment_date BETWEEN ? AND ?
+      LEFT JOIN payments p ON sa.allocation_id = p.allocation_id
       WHERE 1=1
     `;
     
-    const values = [monthStart, monthEnd, monthStart, monthEnd, monthStart, monthEnd];
+    const values = [monthStart, monthEnd, monthStart, monthEnd, monthStart, monthEnd, monthStart, monthEnd, monthStart, monthEnd, monthStart, monthEnd];
 
     if (zoneId) {
       query += ' AND z.zone_id = ?';
       values.push(zoneId);
     }
 
-    query += ' GROUP BY z.zone_id ORDER BY z.zone_name';
+    query += ' GROUP BY z.zone_id HAVING (occupied_spaces > 0 OR total_payments > 0 OR total_revenue > 0) ORDER BY z.zone_name';
 
     const [rows] = await db.query(query, values);
     return rows;
