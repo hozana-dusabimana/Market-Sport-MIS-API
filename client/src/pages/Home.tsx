@@ -124,7 +124,7 @@ const Home = () => {
               <CheckCircle className="w-4 h-4 mr-2" />
               Digital Market Management Platform
             </div>
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900 mb-6 leading-tight">
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-blue-700 mb-6 leading-tight">
               Transform Your Market
               <br />
               <span className="text-teal-600">Operations Today</span>
