@@ -170,66 +170,148 @@ const ManagerSeller = () => {
 
       {showCreate && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Create Seller</h2>
-              <button className="btn btn-secondary" onClick={() => setShowCreate(false)}>Close</button>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 md:p-8">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Create Seller</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Register a new seller account for your market. Login details will be sent or communicated by you.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="text-gray-500 hover:text-gray-700 text-sm font-medium"
+                onClick={() => setShowCreate(false)}
+              >
+                Close
+              </button>
             </div>
-            <form onSubmit={handleSubmit(onCreate)} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2">
-                <label className="label">Full Name</label>
-                <input className="input" {...register('full_name')} />
-                {errors.full_name && <p className="text-red-600 text-xs mt-1">{errors.full_name.message}</p>}
+
+            <form onSubmit={handleSubmit(onCreate)} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="label">Full Name</label>
+                  <input
+                    className="input"
+                    placeholder="Seller full name"
+                    {...register('full_name')}
+                  />
+                  {errors.full_name && <p className="text-red-600 text-xs mt-1">{errors.full_name.message}</p>}
+                </div>
+                <div>
+                  <label className="label">ID Number</label>
+                  <input
+                    className="input"
+                    placeholder="National ID or document number"
+                    {...register('id_number')}
+                  />
+                  {errors.id_number && <p className="text-red-600 text-xs mt-1">{errors.id_number.message}</p>}
+                </div>
+                <div>
+                  <label className="label">Phone</label>
+                  <input
+                    className="input"
+                    placeholder="Primary phone number"
+                    {...register('phone_number')}
+                  />
+                  {errors.phone_number && <p className="text-red-600 text-xs mt-1">{errors.phone_number.message}</p>}
+                </div>
+                <div>
+                  <label className="label">Email</label>
+                  <input
+                    type="email"
+                    className="input"
+                    placeholder="Email (optional)"
+                    {...register('email')}
+                  />
+                  {errors.email && <p className="text-red-600 text-xs mt-1">{errors.email.message}</p>}
+                </div>
+                <div>
+                  <label className="label">Username</label>
+                  <input
+                    className="input"
+                    placeholder="Login username"
+                    {...register('username')}
+                  />
+                  {errors.username && <p className="text-red-600 text-xs mt-1">{errors.username.message}</p>}
+                </div>
+                <div>
+                  <label className="label">Password</label>
+                  <input
+                    type="password"
+                    className="input"
+                    placeholder="Temporary password"
+                    {...register('password')}
+                  />
+                  {errors.password && <p className="text-red-600 text-xs mt-1">{errors.password.message}</p>}
+                </div>
               </div>
-              <div>
-                <label className="label">ID Number</label>
-                <input className="input" {...register('id_number')} />
-                {errors.id_number && <p className="text-red-600 text-xs mt-1">{errors.id_number.message}</p>}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+                <div>
+                  <label className="label">Business Name</label>
+                  <input
+                    className="input"
+                    placeholder="Registered business name"
+                    {...register('business_name')}
+                  />
+                </div>
+                <div>
+                  <label className="label">Business Type</label>
+                  <input
+                    className="input"
+                    placeholder="e.g. Retail, Food, Services"
+                    {...register('business_type')}
+                  />
+                </div>
+                <div>
+                  <label className="label">TIN</label>
+                  <input
+                    className="input"
+                    placeholder="Tax Identification Number"
+                    {...register('tin_number')}
+                  />
+                </div>
+                <div>
+                  <label className="label">Emergency Contact</label>
+                  <input
+                    className="input"
+                    placeholder="Emergency contact phone"
+                    {...register('emergency_contact')}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="label">Address</label>
+                  <textarea
+                    className="input"
+                    rows={3}
+                    placeholder="Business or stall address"
+                    {...register('address')}
+                  />
+                </div>
               </div>
-              <div>
-                <label className="label">Username</label>
-                <input className="input" {...register('username')} />
-                {errors.username && <p className="text-red-600 text-xs mt-1">{errors.username.message}</p>}
-              </div>
-              <div>
-                <label className="label">Email</label>
-                <input type="email" className="input" {...register('email')} />
-                {errors.email && <p className="text-red-600 text-xs mt-1">{errors.email.message}</p>}
-              </div>
-              <div>
-                <label className="label">Phone</label>
-                <input className="input" {...register('phone_number')} />
-                {errors.phone_number && <p className="text-red-600 text-xs mt-1">{errors.phone_number.message}</p>}
-              </div>
-              <div>
-                <label className="label">Password</label>
-                <input type="password" className="input" {...register('password')} />
-                {errors.password && <p className="text-red-600 text-xs mt-1">{errors.password.message}</p>}
-              </div>
-              <div>
-                <label className="label">Business Name</label>
-                <input className="input" {...register('business_name')} />
-              </div>
-              <div>
-                <label className="label">Business Type</label>
-                <input className="input" {...register('business_type')} />
-              </div>
-              <div>
-                <label className="label">TIN</label>
-                <input className="input" {...register('tin_number')} />
-              </div>
-              <div>
-                <label className="label">Emergency Contact</label>
-                <input className="input" {...register('emergency_contact')} />
-              </div>
-              <div className="md:col-span-2">
-                <label className="label">Address</label>
-                <textarea className="input" rows={3} {...register('address')} />
-              </div>
-              <div className="md:col-span-2 flex items-center justify-end space-x-2 pt-2">
-                <button type="button" className="btn btn-secondary" onClick={() => reset()}>Clear</button>
-                <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                  {isSubmitting ? (<span className="inline-flex items-center"><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</span>) : 'Create Seller'}
+
+              <div className="flex items-center justify-end space-x-3 pt-2">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => reset()}
+                >
+                  Clear
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <span className="inline-flex items-center">
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </span>
+                  ) : (
+                    'Create Seller'
+                  )}
                 </button>
               </div>
             </form>

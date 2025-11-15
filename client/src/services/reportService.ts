@@ -1,4 +1,5 @@
 import api from './api'
+import { addDays } from 'date-fns'
 
 export interface Report {
   report_id?: number
@@ -13,12 +14,17 @@ export const reportService = {
   async getOccupancyReport(_startDate: string, _endDate: string): Promise<any> {
     // Backend provides spaces report with counts by status; date range not supported for spaces
     try {
-      const { data } = await api.get('/reports/spaces')
+      const { data } = await api.get('/reports/generate/occupancy', {
+        params: {
+          start_date: _startDate,
+          end_date: _endDate,
+        },
+      })
       const payload = data?.data || data || {}
-      const counts = payload.countsByStatus || {}
+      const summary = payload.summary || {}
       return {
-        occupied: counts.occupied || 0,
-        available: counts.available || 0,
+        occupied: summary.occupied_spaces || 0,
+        available: summary.available_spaces || 0,
       }
     } catch (error) {
       console.error('Error fetching occupancy report:', error)
@@ -28,11 +34,14 @@ export const reportService = {
 
   async getPaymentReport(startDate: string, endDate: string): Promise<any> {
     try {
-      const { data } = await api.get('/reports/payments', {
+      const paymentsResp = await api.get('/payments', {
         params: { date_from: startDate, date_to: endDate },
       })
-      const payload = data?.data || data || {}
-      const rows: Array<{ payment_date?: string; amount?: number; payment_method?: string }> = payload.rows || []
+      const revenueByMethodResp = await api.get('/payments/revenue/by-method', {
+        params: { date_from: startDate, date_to: endDate },
+      })
+      const paymentsPayload = paymentsResp.data?.data || paymentsResp.data || []
+      const rows: Array<{ payment_date?: string; amount?: number; payment_method?: string }> = paymentsPayload || []
 
       // Aggregate trend by date (yyyy-MM-dd)
       const byDateMap: Record<string, number> = {}
@@ -51,7 +60,13 @@ export const reportService = {
         const method = r.payment_method || 'Unknown'
         byMethodMap[method] = (byMethodMap[method] || 0) + Number(r.amount || 0)
       }
-      const by_method = Object.entries(byMethodMap).map(([method, amount]) => ({ method, amount }))
+      const by_method =
+        (revenueByMethodResp.data?.data || revenueByMethodResp.data || []).map(
+          (row: any) => ({
+            method: row.payment_method || row.method || 'Unknown',
+            amount: Number(row.total_amount || row.total || row.amount || 0),
+          })
+        ) || Object.entries(byMethodMap).map(([method, amount]) => ({ method, amount }))
 
       return { data: trend, by_method }
     } catch (error) {
@@ -76,7 +91,7 @@ export const reportService = {
   async getDailyReport(date: string): Promise<Report> {
     try {
       // Not implemented; proxy to overview using a single day window
-      const { data } = await api.get('/reports/overview', { params: { date_from: date, date_to: date } })
+      const { data } = await api.get('/reports/generate/daily', { params: { date } })
       return data?.data || data
     } catch (error) {
       console.error('Error fetching daily report:', error)
@@ -87,7 +102,12 @@ export const reportService = {
   async getWeeklyReport(weekStart: string): Promise<Report> {
     try {
       // Not implemented; proxy to overview using week window
-      const { data } = await api.get('/reports/overview', { params: { date_from: weekStart } })
+      const start = weekStart
+      const end = addDays(new Date(weekStart), 6)
+      const endStr = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`
+      const { data } = await api.get('/reports/generate/weekly', {
+        params: { start_date: start, end_date: endStr },
+      })
       return data?.data || data
     } catch (error) {
       console.error('Error fetching weekly report:', error)
@@ -99,9 +119,9 @@ export const reportService = {
     try {
       // Not implemented; proxy to overview for the month range (first day to last day)
       const m = String(month).padStart(2, '0')
-      const from = `${year}-${m}-01`
-      const to = `${year}-${m}-31`
-      const { data } = await api.get('/reports/overview', { params: { date_from: from, date_to: to } })
+      const { data } = await api.get('/reports/generate/monthly', {
+        params: { year, month: m },
+      })
       return data?.data || data
     } catch (error) {
       console.error('Error fetching monthly report:', error)

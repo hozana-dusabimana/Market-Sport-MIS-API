@@ -184,6 +184,15 @@ const SellerDashboard = () => {
     }
   )
 
+  const markDashboardNotificationAsRead = useMutation(
+    (id: number) => notificationService.markAsRead(id),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('seller-notifications')
+      },
+    }
+  )
+
   const { data: sellerStats } = useQuery(
     ['seller-statistics', sellerId],
     () => sellerService.getStatistics(sellerId),
@@ -768,28 +777,33 @@ const SellerDashboard = () => {
                 })
                 .slice(0, 5)
                 .map((notification: any) => {
-                const isUnread = notification.status === 'unread' || !notification.is_read
-                return (
-                  <div
-                    key={notification.notification_id}
-                    className={`p-3 rounded-lg border-l-4 ${
-                      notification.notification_type === 'payment'
-                        ? 'bg-green-50 border-green-500'
-                        : notification.notification_type === 'allocation'
-                        ? 'bg-blue-50 border-blue-500'
-                        : notification.notification_type === 'verification'
-                        ? 'bg-yellow-50 border-yellow-500'
-                        : 'bg-gray-50 border-gray-500'
-                    } ${isUnread ? 'font-semibold' : ''}`}
-                  >
-                    <h4 className="text-sm font-medium text-gray-900">{notification.title}</h4>
-                    <p className="text-xs text-gray-600 mt-1 line-clamp-2">{notification.message}</p>
-                    <p className="text-xs text-gray-500 mt-2">
-                      {notification.created_at && format(new Date(notification.created_at), 'MMM dd, yyyy HH:mm')}
-                    </p>
-                  </div>
-                )
-              })}
+                  const isUnread = notification.status === 'unread' || !notification.is_read
+                  return (
+                    <div
+                      key={notification.notification_id}
+                      className={`p-3 rounded-lg border-l-4 ${
+                        notification.notification_type === 'payment'
+                          ? 'bg-green-50 border-green-500'
+                          : notification.notification_type === 'allocation'
+                          ? 'bg-blue-50 border-blue-500'
+                          : notification.notification_type === 'verification'
+                          ? 'bg-yellow-50 border-yellow-500'
+                          : 'bg-gray-50 border-gray-500'
+                      } ${isUnread ? 'font-semibold' : ''}`}
+                      onClick={() => {
+                        if (isUnread && notification.notification_id) {
+                          markDashboardNotificationAsRead.mutate(notification.notification_id)
+                        }
+                      }}
+                    >
+                      <h4 className="text-sm font-medium text-gray-900">{notification.title}</h4>
+                      <p className="text-xs text-gray-600 mt-1 line-clamp-2">{notification.message}</p>
+                      <p className="text-xs text-gray-500 mt-2">
+                        {notification.created_at && format(new Date(notification.created_at), 'MMM dd, yyyy HH:mm')}
+                      </p>
+                    </div>
+                  )
+                })}
             </div>
           ) : (
             <div className="text-center py-8">
@@ -957,11 +971,25 @@ const SellerDashboard = () => {
               onSubmit={(e) => {
                 e.preventDefault()
                 if (paymentForm.payment_method === 'mobile_money' && paymentForm.mobile_money_number) {
+                  const alloc = activeAllocations.find(
+                    (a: any) => a.allocation_id === paymentForm.allocation_id
+                  )
+                  const baseStart = alloc?.end_date
+                    ? parseISO(alloc.end_date)
+                    : paymentForm.payment_date
+                    ? parseISO(paymentForm.payment_date as string)
+                    : new Date()
+                  const periodStart = format(baseStart, 'yyyy-MM-dd')
+                  const nextEnd = alloc ? computeNextPeriodEnd(alloc) : addMonths(baseStart, 1)
+                  const periodEnd = format(nextEnd, 'yyyy-MM-dd')
+
                   lanariMutation.mutate({
                     allocation_id: paymentForm.allocation_id!,
                     seller_id: sellerId!,
                     amount: Number(paymentForm.amount) || 0,
                     customer_phone: paymentForm.mobile_money_number,
+                    payment_period_start: periodStart,
+                    payment_period_end: periodEnd,
                     notes: paymentForm.notes,
                   })
                 } else {

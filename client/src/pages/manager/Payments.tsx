@@ -198,7 +198,7 @@ const ManagerPayments = () => {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {Object.entries(revenueByMethodLocal).map(([method, total]) => (
                   <div key={method} className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-600 capitalize">{String(method).replace('_', ' ')}</p>
+                    <p className="text-xs text-gray-600 capitalize">{String(method || 'unknown').replace('_', ' ')}</p>
                     <p className="text-lg font-bold text-gray-900">${Number(total).toFixed(2)}</p>
                   </div>
                 ))}
@@ -270,6 +270,11 @@ const ManagerPayments = () => {
                 payments.map((payment: Payment) => {
                   const seller = sellers.find((s: any) => (s.seller_id || s.user_id) === payment.seller_id)
                   const owned = managerId && (payment as any).manager_id === managerId
+                  const methodLabel = payment.payment_method && payment.payment_method.trim().length > 0
+                    ? payment.payment_method
+                    : payment.mobile_money_provider === 'lanari'
+                    ? 'mobile_money_lanari'
+                    : payment.mobile_money_provider || 'unknown'
                   return (
                     <tr key={payment.payment_id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-3 px-4">#{payment.payment_id}</td>
@@ -277,7 +282,7 @@ const ManagerPayments = () => {
                         {seller?.business_name || seller?.full_name || seller?.user?.username || `Seller #${payment.seller_id}`}
                       </td>
                       <td className="py-3 px-4 font-medium">${Number(payment.amount || 0).toFixed(2)}</td>
-                      <td className="py-3 px-4 capitalize">{payment.payment_method?.replace('_', ' ')}</td>
+                      <td className="py-3 px-4 capitalize">{methodLabel.replace('_', ' ')}</td>
                       <td className="py-3 px-4">
                         {format(new Date(payment.payment_date), 'MMM dd, yyyy')}
                       </td>
