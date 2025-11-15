@@ -107,11 +107,17 @@ const SellerPayments = () => {
             </thead>
             <tbody>
               {payments.length > 0 ? (
-                payments.map((payment: any) => (
-                  <tr key={payment.payment_id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-4">#{payment.payment_id}</td>
-                    <td className="py-3 px-4 font-medium">${Number(payment.amount || 0).toFixed(2)}</td>
-                    <td className="py-3 px-4 capitalize">{payment.payment_method.replace('_', ' ')}</td>
+                payments.map((payment: any) => {
+                  const methodLabel = payment.payment_method && payment.payment_method.trim().length > 0
+                    ? payment.payment_method
+                    : payment.mobile_money_provider === 'lanari'
+                    ? 'mobile_money_lanari'
+                    : payment.mobile_money_provider || 'unknown'
+                  return (
+                    <tr key={payment.payment_id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-3 px-4">#{payment.payment_id}</td>
+                      <td className="py-3 px-4 font-medium">${Number(payment.amount || 0).toFixed(2)}</td>
+                      <td className="py-3 px-4 capitalize">{methodLabel.replace('_', ' ')}</td>
                     <td className="py-3 px-4">
                       {format(new Date(payment.payment_date), 'MMM dd, yyyy')}
                     </td>
@@ -155,7 +161,8 @@ const SellerPayments = () => {
                       )}
                     </td>
                   </tr>
-                ))
+                  )
+                })
               ) : (
                 <tr>
                   <td colSpan={6} className="py-8 text-center text-gray-500">

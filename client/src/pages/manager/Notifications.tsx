@@ -219,6 +219,11 @@ const ManagerNotifications = () => {
                   className={`border rounded-lg p-4 ${
                     isUnread ? 'bg-blue-50 border-blue-200' : 'bg-white border-neutral-200'
                   }`}
+                  onClick={() => {
+                    if (isUnread && notification.notification_id) {
+                      markAsReadMutation.mutate(notification.notification_id)
+                    }
+                  }}
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
