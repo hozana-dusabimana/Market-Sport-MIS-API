@@ -150,7 +150,7 @@ export const paymentService = {
     notes?: string
   }) => {
     try {
-      const response = await api.post('/payments/lanari/process', payload)
+      const response = await api.post('/payments', payload)
       return response.data
     } catch (error) {
       console.error('Error initiating Lanari payment:', error)
@@ -169,7 +169,7 @@ export const paymentService = {
     notes?: string
   }) => {
     try {
-      const response = await api.post('/payments/lanari/process-auto', payload)
+      const response = await api.post('/payments', payload)
       return response.data
     } catch (error) {
       console.error('Error initiating Lanari auto payment:', error)

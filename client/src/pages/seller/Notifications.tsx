@@ -49,7 +49,8 @@ const SellerNotifications = () => {
     (id: number) => notificationService.markAsRead(id),
     {
       onSuccess: () => {
-        queryClient.invalidateQueries('seller-notifications')
+        queryClient.invalidateQueries('seller-user-notifications')
+        queryClient.invalidateQueries('seller-id-notifications')
       },
     }
   )
@@ -97,38 +98,37 @@ const SellerNotifications = () => {
             notifications.map((notification: any) => {
               const isUnread = notification.status === 'unread' || !notification.is_read
               return (
-              <div
-                key={notification.notification_id}
-                className={`p-4 rounded-lg border-l-4 ${
-                  notification.notification_type === 'payment'
-                    ? 'bg-green-50 border-green-500'
-                    : notification.notification_type === 'allocation'
-                    ? 'bg-blue-50 border-blue-500'
-                    : notification.notification_type === 'verification'
-                    ? 'bg-yellow-50 border-yellow-500'
-                    : 'bg-gray-50 border-gray-500'
-                } ${isUnread ? 'font-semibold' : ''}`}
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900">{notification.title}</h3>
-                    <p className="text-gray-700 mt-1">{notification.message}</p>
-                    <p className="text-sm text-gray-500 mt-2">
-                      {notification.created_at &&
-                        format(new Date(notification.created_at), 'MMM dd, yyyy HH:mm')}
-                    </p>
+                <div
+                  key={notification.notification_id}
+                  className={`p-4 rounded-lg border-l-4 ${
+                    notification.notification_type === 'payment'
+                      ? 'bg-green-50 border-green-500'
+                      : notification.notification_type === 'allocation'
+                      ? 'bg-blue-50 border-blue-500'
+                      : notification.notification_type === 'verification'
+                      ? 'bg-yellow-50 border-yellow-500'
+                      : 'bg-gray-50 border-gray-500'
+                  } ${isUnread ? 'font-semibold' : ''}`}
+                  onClick={() => {
+                    if (isUnread && notification.notification_id) {
+                      markAsReadMutation.mutate(notification.notification_id)
+                    }
+                  }}
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-gray-900">{notification.title}</h3>
+                      <p className="text-gray-700 mt-1">{notification.message}</p>
+                      <p className="text-sm text-gray-500 mt-2">
+                        {notification.created_at &&
+                          format(new Date(notification.created_at), 'MMM dd, yyyy HH:mm')}
+                      </p>
+                    </div>
+                    {isUnread && (
+                      <Check className="ml-4 text-primary-600" size={20} />
+                    )}
                   </div>
-                  {isUnread && (
-                    <button
-                      onClick={() => markAsReadMutation.mutate(notification.notification_id)}
-                      className="ml-4 text-primary-600 hover:text-primary-700"
-                      title="Mark as read"
-                    >
-                      <Check size={20} />
-                    </button>
-                  )}
                 </div>
-              </div>
               )
             })
           ) : (
