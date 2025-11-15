@@ -100,12 +100,68 @@ class NotificationController {
     }
   }
 
-  // Notifications are now created automatically - manual creation disabled
+  // Manual notification creation (admin/manager tools)
   async createNotification(req, res) {
-    return res.status(405).json({
-      success: false,
-      message: 'Manual notification creation is disabled. Notifications are created automatically based on system events.'
-    });
+    try {
+      const { user_id, seller_id, title, message, notification_type, related_id, action_url } = req.body;
+
+      if (!title || !message) {
+        return res.status(400).json({ success: false, message: 'Title and message are required' });
+      }
+
+      // Helper to create a single notification, resolving seller -> user_id when needed
+      const createForTarget = async (targetUserId, targetSellerId) => {
+        const payload = {
+          user_id: targetUserId,
+          seller_id: targetSellerId || null,
+          title,
+          message,
+          notification_type: notification_type || 'system',
+          related_id: related_id || null,
+          action_url: action_url || null,
+        };
+        return Notification.create(payload);
+      };
+
+      // 1) Direct user notification
+      if (user_id) {
+        const id = await createForTarget(user_id, seller_id || null);
+        return res.status(201).json({ success: true, message: 'Notification created', notification_id: id });
+      }
+
+      // 2) Seller-specific notification (resolve seller -> user)
+      if (seller_id) {
+        const [rows] = await db.query('SELECT user_id FROM sellers WHERE seller_id = ? LIMIT 1', [seller_id]);
+        const row = rows?.[0];
+        if (!row?.user_id) {
+          return res.status(400).json({ success: false, message: 'Seller not found or missing user mapping' });
+        }
+        const id = await createForTarget(row.user_id, seller_id);
+        return res.status(201).json({ success: true, message: 'Notification created for seller', notification_id: id });
+      }
+
+      // 3) Broadcast: send to all users
+      const [userRows] = await db.query('SELECT user_id FROM users');
+      if (!userRows || userRows.length === 0) {
+        return res.status(400).json({ success: false, message: 'No users found to broadcast to' });
+      }
+
+      const ids = [];
+      for (const u of userRows) {
+        if (!u.user_id) continue;
+        const id = await createForTarget(u.user_id, null);
+        ids.push(id);
+      }
+
+      return res.status(201).json({
+        success: true,
+        message: `Broadcast notification created for ${ids.length} user(s)`,
+        count: ids.length,
+      });
+    } catch (error) {
+      console.error('Create notification error:', error);
+      return res.status(500).json({ success: false, message: 'Failed to create notification', error: error.message });
+    }
   }
 
   // Update notification

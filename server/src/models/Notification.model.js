@@ -31,8 +31,10 @@ class Notification {
     }
 
     if (filters.manager_id) {
-      // Only notifications tied to sellers owned by this manager
-      query += ' AND s.manager_id = ?';
+      // Only notifications tied to sellers owned by this manager.
+      // Some databases may not have a dedicated manager_id column on sellers,
+      // but do track created_by_manager_id. Scope using that stable field.
+      query += ' AND s.created_by_manager_id = ?';
       values.push(filters.manager_id);
     }
 
