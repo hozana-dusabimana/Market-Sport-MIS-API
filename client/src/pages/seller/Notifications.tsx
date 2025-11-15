@@ -3,8 +3,18 @@ import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { useAuthStore } from '../../store/authStore'
 import { notificationService } from '../../services/notificationService'
 import { sellerService } from '../../services/sellerService'
-import { Bell, Check, ChevronDown, ChevronUp } from 'lucide-react'
+import { Bell, ChevronDown, ChevronUp } from 'lucide-react'
 import { format } from 'date-fns'
+
+type NotificationItem = {
+  notification_id: number
+  title?: string
+  message?: string
+  created_at?: string
+  status?: 'read' | 'unread' | string
+  is_read?: boolean
+  notification_type?: 'payment' | 'allocation' | 'verification' | 'system' | string
+}
 
 const SellerNotifications = () => {
   const { user } = useAuthStore()
@@ -30,14 +40,14 @@ const SellerNotifications = () => {
     { enabled: !!sellerId, retry: false }
   )
 
-  const listA = notificationsUserData?.data || []
-  const listB = notificationsSellerData?.data || []
-  const notificationsMap: Record<string, any> = {}
-  ;[...listA, ...listB].forEach((n: any) => {
+  const listA: NotificationItem[] = (notificationsUserData?.data || []) as NotificationItem[]
+  const listB: NotificationItem[] = (notificationsSellerData?.data || []) as NotificationItem[]
+  const notificationsMap: Record<string, NotificationItem> = {}
+  ;[...listA, ...listB].forEach((n) => {
     const key = String(n.notification_id || `${n.title}-${n.created_at}`)
     notificationsMap[key] = n
   })
-  const notifications = Object.values(notificationsMap).sort((a: any, b: any) => {
+  const notifications: NotificationItem[] = Object.values(notificationsMap).sort((a, b) => {
     const ta = a.created_at ? new Date(a.created_at).getTime() : 0
     const tb = b.created_at ? new Date(b.created_at).getTime() : 0
     return tb - ta
@@ -45,25 +55,60 @@ const SellerNotifications = () => {
 
   const markAsReadMutation = useMutation(
     (id: number) => notificationService.markAsRead(id),
-    { onSuccess: () => {
+    {
+      onMutate: async (id: number) => {
+        await queryClient.cancelQueries('seller-user-notifications')
+        await queryClient.cancelQueries('seller-id-notifications')
+        const prevUser = queryClient.getQueryData<unknown>('seller-user-notifications')
+        const prevSeller = queryClient.getQueryData<unknown>(['seller-id-notifications', sellerId])
+        const updateList = (data: unknown) => {
+          if (!data) return data
+          const d = data as { data?: NotificationItem[] }
+          const arr = d.data ?? (data as NotificationItem[])
+          const updated = arr.map(n => n.notification_id === id ? { ...n, is_read: true, status: 'read' } : n)
+          return Array.isArray(arr) ? updated : { ...(data as object), data: updated }
+        }
+        queryClient.setQueryData('seller-user-notifications', (data: unknown) => updateList(data))
+        queryClient.setQueryData(['seller-id-notifications', sellerId], (data: unknown) => updateList(data))
+        return { prevUser, prevSeller }
+      },
+      onError: (_err, _id, ctx?: { prevUser?: unknown; prevSeller?: unknown }) => {
+        if (ctx?.prevUser) queryClient.setQueryData('seller-user-notifications', ctx.prevUser)
+        if (ctx?.prevSeller) queryClient.setQueryData(['seller-id-notifications', sellerId], ctx.prevSeller)
+      },
+      onSuccess: () => {
         queryClient.invalidateQueries('seller-user-notifications')
-        queryClient.invalidateQueries('seller-id-notifications')
-      }
+        queryClient.invalidateQueries(['seller-id-notifications', sellerId])
+      },
     }
   )
 
   const markAllAsReadMutation = useMutation(async () => {
     const unreadIds = notifications
-      .filter((n: any) => n.status === 'unread' || !n.is_read)
-      .map((n: any) => n.notification_id)
+      .filter((n) => n.status === 'unread' || !n.is_read)
+      .map((n) => n.notification_id)
       .filter(Boolean)
     if (unreadIds.length > 0) {
       await notificationService.markMultipleAsRead(unreadIds as number[])
     }
     return { success: true }
-  }, { onSuccess: () => {
+  }, {
+    onMutate: async () => {
+      await queryClient.cancelQueries('seller-user-notifications')
+      await queryClient.cancelQueries(['seller-id-notifications', sellerId])
+      const updateAll = (data: unknown) => {
+        if (!data) return data
+        const d = data as { data?: NotificationItem[] }
+        const arr = d.data ?? (data as NotificationItem[])
+        const updated = arr.map(n => ({ ...n, is_read: true, status: 'read' }))
+        return Array.isArray(arr) ? updated : { ...(data as object), data: updated }
+      }
+      queryClient.setQueryData('seller-user-notifications', (data: unknown) => updateAll(data))
+      queryClient.setQueryData(['seller-id-notifications', sellerId], (data: unknown) => updateAll(data))
+    },
+    onSuccess: () => {
       queryClient.invalidateQueries('seller-user-notifications')
-      queryClient.invalidateQueries('seller-id-notifications')
+      queryClient.invalidateQueries(['seller-id-notifications', sellerId])
     }
   })
 
@@ -71,9 +116,9 @@ const SellerNotifications = () => {
     return <div className="text-center py-12 text-gray-500">Loading notifications...</div>
   }
 
-  const unreadCount = notifications?.filter((n: any) => n.status === 'unread' || !n.is_read)?.length || 0
+  const unreadCount = notifications?.filter((n) => n.status === 'unread' || !n.is_read)?.length || 0
 
-  const handleToggle = (notification: any) => {
+  const handleToggle = (notification: NotificationItem) => {
     const isUnread = notification.status === 'unread' || !notification.is_read
     if (isUnread && notification.notification_id) {
       markAsReadMutation.mutate(notification.notification_id)
@@ -82,23 +127,22 @@ const SellerNotifications = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">Notifications</h1>
+    <div className="container space-y-6">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Notifications</h1>
+          <p className="text-gray-600 mt-1">Unread: <span className="font-bold text-blue-900">{unreadCount}</span></p>
+        </div>
         {unreadCount > 0 && (
-          <button
-            onClick={() => markAllAsReadMutation.mutate()}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-          >
-            <Check size={18} />
-            <span>Mark All Read</span>
+          <button onClick={() => markAllAsReadMutation.mutate()} className="btn-primary">
+            Mark All Read
           </button>
         )}
       </div>
 
       <div className="space-y-4">
         {notifications.length > 0 ? (
-          notifications.map((notification: any) => {
+          notifications.map((notification) => {
             const isUnread = notification.status === 'unread' || !notification.is_read
             const isOpen = openId === notification.notification_id
             let typeColor = 'bg-gray-50 border-gray-300'
@@ -109,7 +153,7 @@ const SellerNotifications = () => {
             return (
               <div
                 key={notification.notification_id}
-                className={`border-l-4 rounded-lg shadow-sm cursor-pointer transition hover:shadow-md ${typeColor} ${isUnread ? 'font-semibold' : 'font-normal'}`}
+                className={`card border-l-4 cursor-pointer transition hover:shadow-lg ${typeColor} ${isUnread ? 'font-semibold' : 'font-normal'}`}
                 onClick={() => handleToggle(notification)}
               >
                 <div className="flex justify-between items-center p-4">

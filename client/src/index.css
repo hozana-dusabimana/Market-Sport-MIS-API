@@ -1,3 +1,78 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer components {
+  .container { @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8; }
+  .nav { @apply bg-white shadow-md sticky top-0 z-50; }
+  .nav-inner { @apply flex justify-between items-center h-20; }
+  .brand { @apply flex items-center; }
+  .brand-icon { @apply w-12 h-12 bg-teal-500 rounded-lg flex items-center justify-center mr-3 transition-transform; }
+  .brand-text { @apply text-3xl font-extrabold text-blue-900; }
+  .nav-actions { @apply flex items-center space-x-6; }
+  .link-muted { @apply text-gray-700 hover:text-teal-600 font-semibold transition-colors; }
+
+  .btn-primary { @apply bg-teal-600 hover:bg-teal-700 text-white px-10 py-4 rounded-xl font-extrabold text-lg transition-all transform hover:scale-[1.02] shadow-xl; }
+  .btn-outline { @apply bg-white hover:bg-gray-100 text-teal-600 border-2 border-teal-500 px-10 py-4 rounded-xl font-bold text-lg transition-all shadow-md; }
+
+  .hero-badge { @apply inline-flex items-center px-4 py-2 bg-teal-100 text-teal-800 rounded-full text-sm font-medium mb-8 border border-teal-200; }
+  .hero-title { @apply text-5xl md:text-7xl lg:text-8xl font-extrabold text-blue-900 mb-6 leading-tight tracking-tighter; }
+  .hero-subtitle { @apply text-teal-600 block mt-2; }
+  .hero-text { @apply text-xl text-gray-600 mb-10 max-w-2xl leading-relaxed; }
+
+  .stats-section { @apply bg-blue-900 text-white py-12; }
+  .stats-grid { @apply grid grid-cols-2 md:grid-cols-4 gap-8; }
+  .stat-item { @apply text-center border-r last:border-r-0 border-blue-700/50; }
+  .stat-number { @apply text-4xl md:text-5xl font-extrabold mb-1; }
+  .stat-label { @apply text-teal-300 uppercase tracking-wider text-sm; }
+
+  .section { @apply py-24 bg-white; }
+  .section-title { @apply text-4xl lg:text-5xl font-extrabold text-blue-900 mb-4; }
+  .section-subtext { @apply text-xl text-gray-600 max-w-3xl mx-auto; }
+
+  .card { @apply bg-white p-8 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100; }
+  .card-icon { @apply w-16 h-16 rounded-xl flex items-center justify-center mb-6 shadow-lg; }
+  .card-title { @apply text-2xl font-bold text-gray-900 mb-3; }
+  .card-desc { @apply text-gray-600 leading-relaxed; }
+
+  .benefits-section { @apply py-24 bg-gradient-to-br from-gray-50 to-teal-100; }
+  .benefit-card { @apply text-center p-6 bg-white rounded-xl shadow-md border-t-4 border-teal-500; }
+  .benefit-icon { @apply bg-teal-500 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg; }
+  .benefit-title { @apply text-xl font-extrabold text-gray-900 mb-3; }
+  .benefit-desc { @apply text-gray-600; }
+
+  .cta-section { @apply py-20 bg-teal-600; }
+  .cta-title { @apply text-4xl md:text-5xl font-extrabold text-white mb-6; }
+  .cta-text { @apply text-xl text-teal-100 mb-12; }
+
+  .footer { @apply bg-gray-900 text-gray-300 py-12; }
+  .footer-title { @apply text-white font-semibold mb-4 border-b border-teal-500/50 pb-2; }
+  .footer-link { @apply hover:text-teal-400 transition-colors; }
+  .footer-brand-icon { @apply w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center mr-3; }
+
+  .gallery-section { @apply py-24 bg-white; }
+  .gallery-title { @apply text-4xl lg:text-5xl font-extrabold text-blue-900 mb-4; }
+  .gallery-subtext { @apply text-xl text-gray-600; }
+  .gallery-grid { @apply grid grid-cols-1 md:grid-cols-3 gap-8; }
+  .gallery-image { @apply w-full h-64 object-cover rounded-2xl shadow-lg; }
+
+  .bg-hero { @apply bg-gradient-to-br from-teal-50 via-white to-gray-50; }
+}
+
+.grid-pattern {
+  background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+@layer components {
+  .btn { @apply inline-flex items-center justify-center rounded-xl font-bold transition-all; }
+  .btn-primary { @apply btn bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 shadow-xl; }
+  .btn-outline { @apply btn bg-white hover:bg-gray-100 text-teal-600 border-2 border-teal-500 px-4 py-2 shadow-md; }
+  .btn-secondary { @apply btn bg-white text-gray-700 border border-gray-300 px-4 py-2 hover:bg-gray-100; }
+  .btn-sm { @apply px-3 py-1 text-sm; }
+
+  .input { @apply w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500; }
+  .label { @apply block text-sm font-medium text-gray-700 mb-1; }
+
+  .tile { @apply relative flex flex-col items-center justify-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition; }
+}
