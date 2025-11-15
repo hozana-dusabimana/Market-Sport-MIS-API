@@ -67,13 +67,11 @@ const ManagerReports = () => {
     { retry: false }
   )
 
-  // === Safe Data Extraction ===
   const occupancyReport = occupancyReportData?.data || occupancyReportData || { occupied: 0, available: 0 }
   const paymentReport = paymentReportData?.data || paymentReportData || { data: [], by_method: [] }
 
   const isLoading = dailyLoading || weeklyLoading || monthlyLoading
 
-  // === Export Function ===
   const handleExport = async (type: string) => {
     try {
       const params =
@@ -96,20 +94,18 @@ const ManagerReports = () => {
   }
 
   const COLORS = ['#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
-
-  // === Helper Function ===
   const safeNumber = (val: any) => Number(val) || 0
 
   return (
-    <div>
+    <div className="min-h-screen p-6 bg-gray-50">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <h1 className="text-3xl font-bold text-gray-900">Reports & Analytics</h1>
-        <div className="flex space-x-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <select
             value={reportType}
             onChange={(e) => setReportType(e.target.value as any)}
-            className="input w-auto"
+            className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
           >
             <option value="daily">Daily</option>
             <option value="weekly">Weekly</option>
@@ -117,54 +113,57 @@ const ManagerReports = () => {
           </select>
           <button
             onClick={() => handleExport(reportType)}
-            className="btn btn-primary flex items-center space-x-2"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium rounded hover:bg-blue-700 transition"
           >
             <Download size={18} />
-            <span>Export</span>
+            Export
           </button>
         </div>
       </div>
 
       {/* Date Selection */}
-      <div className="card mb-6">
-        <div className="flex items-center space-x-4">
-          {reportType === 'daily' && (
-            <div>
-              <label className="label">Select Date</label>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input" />
-            </div>
-          )}
-          {reportType === 'weekly' && (
-            <div>
-              <label className="label">Week Start</label>
-              <input
-                type="date"
-                value={weekStart}
-                onChange={(e) => setWeekStart(e.target.value)}
-                className="input"
-              />
-            </div>
-          )}
-          {reportType === 'monthly' && (
-            <div>
-              <label className="label">Month</label>
-              <input
-                type="month"
-                value={month}
-                onChange={(e) => setMonth(e.target.value)}
-                className="input"
-              />
-            </div>
-          )}
-        </div>
+      <div className="bg-white p-4 rounded shadow mb-6 flex flex-col sm:flex-row gap-4 items-center">
+        {reportType === 'daily' && (
+          <div className="flex flex-col">
+            <label className="text-gray-600 mb-1">Select Date</label>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          </div>
+        )}
+        {reportType === 'weekly' && (
+          <div className="flex flex-col">
+            <label className="text-gray-600 mb-1">Week Start</label>
+            <input
+              type="date"
+              value={weekStart}
+              onChange={(e) => setWeekStart(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          </div>
+        )}
+        {reportType === 'monthly' && (
+          <div className="flex flex-col">
+            <label className="text-gray-600 mb-1">Month</label>
+            <input
+              type="month"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          </div>
+        )}
       </div>
 
       {isLoading ? (
-        <div className="text-center py-12">Loading report...</div>
+        <div className="text-center py-12 text-gray-500">Loading report...</div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Occupancy Chart */}
-          <div className="card">
+          <div className="bg-white p-4 rounded shadow">
             <h2 className="text-xl font-semibold mb-4">Occupancy Rate</h2>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
@@ -190,7 +189,7 @@ const ManagerReports = () => {
           </div>
 
           {/* Payment Trend Chart */}
-          <div className="card">
+          <div className="bg-white p-4 rounded shadow">
             <h2 className="text-xl font-semibold mb-4">Payment Trends</h2>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={Array.isArray(paymentReport) ? paymentReport : paymentReport?.data || []}>
@@ -205,7 +204,7 @@ const ManagerReports = () => {
           </div>
 
           {/* Revenue by Method */}
-          <div className="card lg:col-span-2">
+          <div className="bg-white p-4 rounded shadow lg:col-span-2">
             <h2 className="text-xl font-semibold mb-4">Revenue by Payment Method</h2>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={paymentReport?.by_method || paymentReport?.data?.by_method || []}>
@@ -221,7 +220,7 @@ const ManagerReports = () => {
 
           {/* Summary Section */}
           {(dailyReport || weeklyReport || monthlyReport) && (
-            <div className="card lg:col-span-2">
+            <div className="bg-white p-4 rounded shadow lg:col-span-2">
               <h2 className="text-xl font-semibold mb-4">Report Summary</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {['daily', 'weekly', 'monthly'].map(

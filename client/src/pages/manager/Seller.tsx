@@ -7,15 +7,16 @@ import { sellerService } from '../../services/sellerService'
 import { authService, RegisterData } from '../../services/authService'
 import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
-import { UserPlus, Search, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
+import { UserPlus, Check, X, Search, Loader } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 const sellerSchema = z.object({
-  username: z.string().min(3, 'Username must be at least 3 characters'),
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  phone_number: z.string().min(6, 'Invalid phone number'),
-  full_name: z.string().min(2, 'Full name is required'),
-  id_number: z.string().min(1, 'ID number is required'),
+  username: z.string().min(3),
+  email: z.string().email(),
+  password: z.string().min(6),
+  phone_number: z.string().min(6),
+  full_name: z.string().min(2),
+  id_number: z.string().min(1),
   business_name: z.string().optional(),
   business_type: z.string().optional(),
   tin_number: z.string().optional(),
@@ -32,26 +33,33 @@ const ManagerSeller = () => {
   const managerId = (user as any)?.profile?.manager_id || (user as any)?.manager_id || (user as any)?.id || null
 
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState<string>('')
+  const [status, setStatus] = useState('')
   const [showCreate, setShowCreate] = useState(false)
 
   const { data: sellersData, isLoading } = useQuery(
     ['sellers', managerId, search, status],
-    () => sellerService.getAll({ manager_id: managerId || undefined, search: search || undefined, verification_status: status || undefined, limit: 100 }),
-    { enabled: !!isManager, keepPreviousData: true }
+    () =>
+      sellerService.getAll({
+        manager_id: managerId || undefined,
+        search: search || undefined,
+        verification_status: status || undefined,
+        limit: 100,
+      }),
+    { enabled: !!isManager }
   )
 
   const sellers = (sellersData?.data?.sellers || sellersData?.data || []).filter((s: any) => {
-    const createdBy = Number(s.created_by_manager_id)
     const mid = managerId != null ? Number(managerId) : null
-    if (mid == null) return true
-    return createdBy === mid || Number(s.manager_id) === mid
+    return mid == null || Number(s.created_by_manager_id) === mid || Number(s.manager_id) === mid
   })
 
   const verifyMutation = useMutation(
     async (id: number) => sellerService.updateVerificationStatus(id, 'verified'),
     {
-      onSuccess: () => { queryClient.invalidateQueries('sellers'); toast.success('Seller verified') },
+      onSuccess: () => {
+        queryClient.invalidateQueries('sellers')
+        toast.success('Seller verified')
+      },
       onError: (e: any) => toast.error(e?.response?.data?.message || 'Failed to verify seller'),
     }
   )
@@ -59,12 +67,17 @@ const ManagerSeller = () => {
   const rejectMutation = useMutation(
     async (id: number) => sellerService.updateVerificationStatus(id, 'rejected'),
     {
-      onSuccess: () => { queryClient.invalidateQueries('sellers'); toast.success('Seller rejected') },
+      onSuccess: () => {
+        queryClient.invalidateQueries('sellers')
+        toast.success('Seller rejected')
+      },
       onError: (e: any) => toast.error(e?.response?.data?.message || 'Failed to reject seller'),
     }
   )
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<SellerFormData>({ resolver: zodResolver(sellerSchema) })
+  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<SellerFormData>({
+    resolver: zodResolver(sellerSchema),
+  })
 
   const onCreate = async (data: SellerFormData) => {
     try {
@@ -87,237 +100,135 @@ const ManagerSeller = () => {
   }
 
   return (
-    <div className="p-4">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold">My Sellers</h1>
-        <div className="flex items-center space-x-2">
-          <div className="flex items-center border rounded-lg px-2">
-            <Search size={16} className="text-gray-500" />
+    <div className="p-6 bg-gray-50 min-h-screen">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
+        <h1 className="text-3xl font-bold text-gray-900">My Sellers</h1>
+        <div className="flex flex-wrap gap-2">
+          <div className="flex items-center bg-white rounded shadow px-3 py-1">
+            <Search className="text-gray-400 mr-2" />
             <input
+              type="text"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="input border-0 focus:ring-0"
+              onChange={e => setSearch(e.target.value)}
               placeholder="Search sellers..."
+              className="outline-none px-2 py-1 w-full"
             />
           </div>
-          <select className="input w-auto" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">All</option>
+          <select value={status} onChange={e => setStatus(e.target.value)} className="rounded shadow px-3 py-1">
+            <option value="">All Status</option>
             <option value="pending">Pending</option>
             <option value="verified">Verified</option>
             <option value="rejected">Rejected</option>
           </select>
-          <button className="btn btn-primary flex items-center" onClick={() => setShowCreate(true)}>
-            <UserPlus size={18} className="mr-2" /> New Seller
+          <button
+            onClick={() => setShowCreate(true)}
+            className="flex items-center bg-blue-600 text-white px-4 py-1 rounded shadow hover:bg-blue-700 transition"
+          >
+            <UserPlus className="mr-2" /> New Seller
           </button>
         </div>
       </div>
 
-      <div className="card">
+      {/* Sellers Table */}
+      <div className="bg-white rounded shadow overflow-x-auto">
         {isLoading ? (
-          <div className="p-6 text-center">Loading...</div>
+          <div className="p-6 text-center text-gray-600">Loading sellers...</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="text-left text-gray-600 border-b">
-                  <th className="py-2 pr-4">Name</th>
-                  <th className="py-2 pr-4">Business</th>
-                  <th className="py-2 pr-4">Phone</th>
-                  <th className="py-2 pr-4">Status</th>
-                  <th className="py-2 pr-4">Actions</th>
+          <table className="w-full text-left">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="py-3 px-4 font-medium text-gray-700">Name</th>
+                <th className="py-3 px-4 font-medium text-gray-700">Business</th>
+                <th className="py-3 px-4 font-medium text-gray-700">Phone</th>
+                <th className="py-3 px-4 font-medium text-gray-700">Status</th>
+                <th className="py-3 px-4 font-medium text-gray-700">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {sellers.map((s: any) => (
+                <tr key={s.seller_id || s.user_id} className="hover:bg-gray-50 transition">
+                  <td className="py-3 px-4">{s.full_name || s.username}</td>
+                  <td className="py-3 px-4">{s.business_name || '—'}</td>
+                  <td className="py-3 px-4">{s.phone_number || '—'}</td>
+                  <td className="py-3 px-4">
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                      s.verification_status === 'verified'
+                        ? 'bg-green-100 text-green-800'
+                        : s.verification_status === 'rejected'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {s.verification_status || 'pending'}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 flex gap-2">
+                    <button
+                      onClick={() => verifyMutation.mutate(s.seller_id)}
+                      disabled={verifyMutation.isLoading}
+                      className="flex items-center px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition"
+                    >
+                      {verifyMutation.isLoading ? <Loader className="animate-spin h-3 w-3 mr-1" /> : <Check className="mr-1 h-3 w-3" />} Verify
+                    </button>
+                    <button
+                      onClick={() => rejectMutation.mutate(s.seller_id)}
+                      disabled={rejectMutation.isLoading}
+                      className="flex items-center px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition"
+                    >
+                      {rejectMutation.isLoading ? <Loader className="animate-spin h-3 w-3 mr-1" /> : <X className="mr-1 h-3 w-3" />} Reject
+                    </button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {sellers.map((s: any) => (
-                  <tr key={s.seller_id || s.user_id} className="border-b hover:bg-gray-50">
-                    <td className="py-2 pr-4">{s.full_name || s.username || 'N/A'}</td>
-                    <td className="py-2 pr-4">{s.business_name || '—'}</td>
-                    <td className="py-2 pr-4">{s.phone_number || s.user?.phone_number || '—'}</td>
-                    <td className="py-2 pr-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        s.verification_status === 'verified' || s.status === 'active'
-                          ? 'bg-green-100 text-green-800'
-                          : s.verification_status === 'rejected' || s.status === 'inactive'
-                          ? 'bg-gray-100 text-gray-800'
-                          : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {s.verification_status || s.status || 'pending'}
-                      </span>
-                    </td>
-                    <td className="py-2 pr-4 space-x-2">
-                      <button
-                        className="btn btn-xs btn-primary inline-flex items-center"
-                        onClick={() => verifyMutation.mutate(s.seller_id)}
-                        disabled={verifyMutation.isLoading}
-                      >
-                        {verifyMutation.isLoading ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <CheckCircle2 size={14} className="mr-1" />} Verify
-                      </button>
-                      <button
-                        className="btn btn-xs btn-secondary inline-flex items-center"
-                        onClick={() => rejectMutation.mutate(s.seller_id)}
-                        disabled={rejectMutation.isLoading}
-                      >
-                        {rejectMutation.isLoading ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <XCircle size={14} className="mr-1" />} Reject
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
 
-      {showCreate && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 md:p-8">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Create Seller</h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  Register a new seller account for your market. Login details will be sent or communicated by you.
-                </p>
+      {/* Create Seller Modal */}
+      <AnimatePresence>
+        {showCreate && (
+          <motion.div
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6"
+              initial={{ y: 50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 50, opacity: 0 }}
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold">Create Seller</h2>
+                <button onClick={() => setShowCreate(false)} className="text-gray-500 hover:text-gray-700"><X /></button>
               </div>
-              <button
-                type="button"
-                className="text-gray-500 hover:text-gray-700 text-sm font-medium"
-                onClick={() => setShowCreate(false)}
-              >
-                Close
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit(onCreate)} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <label className="label">Full Name</label>
-                  <input
-                    className="input"
-                    placeholder="Seller full name"
-                    {...register('full_name')}
-                  />
-                  {errors.full_name && <p className="text-red-600 text-xs mt-1">{errors.full_name.message}</p>}
+              <form onSubmit={handleSubmit(onCreate)} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <input {...register('full_name')} placeholder="Full Name" className="input w-full" />
+                  <input {...register('id_number')} placeholder="ID Number" className="input w-full" />
+                  <input {...register('phone_number')} placeholder="Phone" className="input w-full" />
+                  <input {...register('email')} placeholder="Email" className="input w-full" />
+                  <input {...register('username')} placeholder="Username" className="input w-full" />
+                  <input {...register('password')} type="password" placeholder="Password" className="input w-full" />
+                  <input {...register('business_name')} placeholder="Business Name" className="input w-full" />
+                  <input {...register('business_type')} placeholder="Business Type" className="input w-full" />
+                  <input {...register('tin_number')} placeholder="TIN Number" className="input w-full" />
+                  <input {...register('emergency_contact')} placeholder="Emergency Contact" className="input w-full" />
+                  <textarea {...register('address')} placeholder="Address" className="input w-full" rows={3}></textarea>
                 </div>
-                <div>
-                  <label className="label">ID Number</label>
-                  <input
-                    className="input"
-                    placeholder="National ID or document number"
-                    {...register('id_number')}
-                  />
-                  {errors.id_number && <p className="text-red-600 text-xs mt-1">{errors.id_number.message}</p>}
+                <div className="flex justify-end gap-3">
+                  <button type="button" onClick={() => reset()} className="btn btn-secondary">Clear</button>
+                  <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+                    {isSubmitting ? 'Saving...' : 'Create Seller'}
+                  </button>
                 </div>
-                <div>
-                  <label className="label">Phone</label>
-                  <input
-                    className="input"
-                    placeholder="Primary phone number"
-                    {...register('phone_number')}
-                  />
-                  {errors.phone_number && <p className="text-red-600 text-xs mt-1">{errors.phone_number.message}</p>}
-                </div>
-                <div>
-                  <label className="label">Email</label>
-                  <input
-                    type="email"
-                    className="input"
-                    placeholder="Email (optional)"
-                    {...register('email')}
-                  />
-                  {errors.email && <p className="text-red-600 text-xs mt-1">{errors.email.message}</p>}
-                </div>
-                <div>
-                  <label className="label">Username</label>
-                  <input
-                    className="input"
-                    placeholder="Login username"
-                    {...register('username')}
-                  />
-                  {errors.username && <p className="text-red-600 text-xs mt-1">{errors.username.message}</p>}
-                </div>
-                <div>
-                  <label className="label">Password</label>
-                  <input
-                    type="password"
-                    className="input"
-                    placeholder="Temporary password"
-                    {...register('password')}
-                  />
-                  {errors.password && <p className="text-red-600 text-xs mt-1">{errors.password.message}</p>}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
-                <div>
-                  <label className="label">Business Name</label>
-                  <input
-                    className="input"
-                    placeholder="Registered business name"
-                    {...register('business_name')}
-                  />
-                </div>
-                <div>
-                  <label className="label">Business Type</label>
-                  <input
-                    className="input"
-                    placeholder="e.g. Retail, Food, Services"
-                    {...register('business_type')}
-                  />
-                </div>
-                <div>
-                  <label className="label">TIN</label>
-                  <input
-                    className="input"
-                    placeholder="Tax Identification Number"
-                    {...register('tin_number')}
-                  />
-                </div>
-                <div>
-                  <label className="label">Emergency Contact</label>
-                  <input
-                    className="input"
-                    placeholder="Emergency contact phone"
-                    {...register('emergency_contact')}
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="label">Address</label>
-                  <textarea
-                    className="input"
-                    rows={3}
-                    placeholder="Business or stall address"
-                    {...register('address')}
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end space-x-3 pt-2">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => reset()}
-                >
-                  Clear
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <span className="inline-flex items-center">
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Saving...
-                    </span>
-                  ) : (
-                    'Create Seller'
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

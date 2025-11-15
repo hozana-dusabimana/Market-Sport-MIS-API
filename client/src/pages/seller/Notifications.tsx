@@ -1,37 +1,35 @@
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { useAuthStore } from '../../store/authStore'
 import { notificationService } from '../../services/notificationService'
 import { sellerService } from '../../services/sellerService'
-import { Bell, Check } from 'lucide-react'
+import { Bell, Check, ChevronDown, ChevronUp } from 'lucide-react'
 import { format } from 'date-fns'
 
 const SellerNotifications = () => {
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
+  const [openId, setOpenId] = useState<number | null>(null)
 
-  // Fetch seller profile to get seller_id
   const { data: sellerProfile } = useQuery(
     ['seller-profile-for-notifs', user?.userId],
     () => sellerService.getByUserId(user!.userId),
-    { enabled: !!user?.userId, retry: false, onError: () => {} }
+    { enabled: !!user?.userId, retry: false }
   )
 
-  // Fetch notifications addressed to the user (system/admin/manager)
   const { data: notificationsUserData, isLoading: loadingUser } = useQuery(
     'seller-user-notifications',
     () => notificationService.getUserNotifications(),
-    { enabled: !!user?.userId, retry: false, onError: () => {} }
+    { enabled: !!user?.userId, retry: false }
   )
 
-  // Fetch notifications addressed to the seller_id (payment-related etc.)
   const sellerId = sellerProfile?.data?.seller_id
   const { data: notificationsSellerData, isLoading: loadingSeller } = useQuery(
     ['seller-id-notifications', sellerId],
     () => notificationService.getAll({ seller_id: sellerId }),
-    { enabled: !!sellerId, retry: false, onError: () => {} }
+    { enabled: !!sellerId, retry: false }
   )
 
-  // Merge and de-duplicate notifications
   const listA = notificationsUserData?.data || []
   const listB = notificationsSellerData?.data || []
   const notificationsMap: Record<string, any> = {}
@@ -47,11 +45,10 @@ const SellerNotifications = () => {
 
   const markAsReadMutation = useMutation(
     (id: number) => notificationService.markAsRead(id),
-    {
-      onSuccess: () => {
+    { onSuccess: () => {
         queryClient.invalidateQueries('seller-user-notifications')
         queryClient.invalidateQueries('seller-id-notifications')
-      },
+      }
     }
   )
 
@@ -64,27 +61,34 @@ const SellerNotifications = () => {
       await notificationService.markMultipleAsRead(unreadIds as number[])
     }
     return { success: true }
-  }, {
-    onSuccess: () => {
+  }, { onSuccess: () => {
       queryClient.invalidateQueries('seller-user-notifications')
       queryClient.invalidateQueries('seller-id-notifications')
-    },
+    }
   })
 
   if (loadingUser || loadingSeller) {
-    return <div className="text-center py-12">Loading notifications...</div>
+    return <div className="text-center py-12 text-gray-500">Loading notifications...</div>
   }
 
   const unreadCount = notifications?.filter((n: any) => n.status === 'unread' || !n.is_read)?.length || 0
 
+  const handleToggle = (notification: any) => {
+    const isUnread = notification.status === 'unread' || !notification.is_read
+    if (isUnread && notification.notification_id) {
+      markAsReadMutation.mutate(notification.notification_id)
+    }
+    setOpenId(openId === notification.notification_id ? null : notification.notification_id)
+  }
+
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
+    <div className="max-w-6xl mx-auto p-6 space-y-6">
+      <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-900">Notifications</h1>
         {unreadCount > 0 && (
           <button
             onClick={() => markAllAsReadMutation.mutate()}
-            className="btn btn-secondary flex items-center space-x-2"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
           >
             <Check size={18} />
             <span>Mark All Read</span>
@@ -92,57 +96,48 @@ const SellerNotifications = () => {
         )}
       </div>
 
-      <div className="card">
-        <div className="space-y-4">
-          {notifications?.length > 0 ? (
-            notifications.map((notification: any) => {
-              const isUnread = notification.status === 'unread' || !notification.is_read
-              return (
-                <div
-                  key={notification.notification_id}
-                  className={`p-4 rounded-lg border-l-4 ${
-                    notification.notification_type === 'payment'
-                      ? 'bg-green-50 border-green-500'
-                      : notification.notification_type === 'allocation'
-                      ? 'bg-blue-50 border-blue-500'
-                      : notification.notification_type === 'verification'
-                      ? 'bg-yellow-50 border-yellow-500'
-                      : 'bg-gray-50 border-gray-500'
-                  } ${isUnread ? 'font-semibold' : ''}`}
-                  onClick={() => {
-                    if (isUnread && notification.notification_id) {
-                      markAsReadMutation.mutate(notification.notification_id)
-                    }
-                  }}
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900">{notification.title}</h3>
-                      <p className="text-gray-700 mt-1">{notification.message}</p>
-                      <p className="text-sm text-gray-500 mt-2">
-                        {notification.created_at &&
-                          format(new Date(notification.created_at), 'MMM dd, yyyy HH:mm')}
-                      </p>
-                    </div>
-                    {isUnread && (
-                      <Check className="ml-4 text-primary-600" size={20} />
-                    )}
+      <div className="space-y-4">
+        {notifications.length > 0 ? (
+          notifications.map((notification: any) => {
+            const isUnread = notification.status === 'unread' || !notification.is_read
+            const isOpen = openId === notification.notification_id
+            let typeColor = 'bg-gray-50 border-gray-300'
+            if (notification.notification_type === 'payment') typeColor = 'bg-green-50 border-green-500'
+            else if (notification.notification_type === 'allocation') typeColor = 'bg-blue-50 border-blue-500'
+            else if (notification.notification_type === 'verification') typeColor = 'bg-yellow-50 border-yellow-500'
+
+            return (
+              <div
+                key={notification.notification_id}
+                className={`border-l-4 rounded-lg shadow-sm cursor-pointer transition hover:shadow-md ${typeColor} ${isUnread ? 'font-semibold' : 'font-normal'}`}
+                onClick={() => handleToggle(notification)}
+              >
+                <div className="flex justify-between items-center p-4">
+                  <div>
+                    <h3 className="text-lg text-gray-900">{notification.title}</h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {notification.created_at && format(new Date(notification.created_at), 'MMM dd, yyyy HH:mm')}
+                    </p>
                   </div>
+                  {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                 </div>
-              )
-            })
-          ) : (
-            <div className="text-center py-12">
-              <Bell className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No notifications</p>
-            </div>
-          )}
-        </div>
+                {isOpen && (
+                  <div className="px-4 pb-4 text-gray-700 border-t border-gray-200">
+                    {notification.message}
+                  </div>
+                )}
+              </div>
+            )
+          })
+        ) : (
+          <div className="text-center py-12">
+            <Bell className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">No notifications</p>
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
 export default SellerNotifications
-
-
