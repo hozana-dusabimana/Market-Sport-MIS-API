@@ -410,7 +410,7 @@ const SellerDashboard = () => {
   }
 
   return (
-    <div>
+    <div className="container space-y-8">
       {/* Header with Profile Info */}
       <div className="flex justify-between items-start mb-6">
         <div>
@@ -422,12 +422,12 @@ const SellerDashboard = () => {
         <div className="flex gap-2">
           <button
             onClick={() => setIsPaymentModalOpen(true)}
-            className="btn btn-primary flex items-center space-x-2"
+            className="btn-primary flex items-center space-x-2"
           >
             <Plus size={18} />
             <span>Make Payment</span>
           </button>
-          <Link to="/profile" className="btn btn-secondary flex items-center space-x-2">
+          <Link to="/profile" className="btn-secondary flex items-center space-x-2">
             <User size={18} />
             <span>Edit Profile</span>
           </Link>
@@ -721,7 +721,7 @@ const SellerDashboard = () => {
               <CreditCard className="w-12 h-12 text-gray-400 mx-auto mb-2" />
               <p className="text-gray-500">No payment history yet</p>
               <button
-                className="btn btn-primary mt-3"
+                className="btn-primary mt-3"
                 onClick={() => setIsPaymentModalOpen(true)}
               >
                 Make your first payment
@@ -809,7 +809,7 @@ const SellerDashboard = () => {
             <div className="text-center py-8">
               <Bell className="w-12 h-12 text-gray-400 mx-auto mb-2" />
               <p className="text-gray-500">No notifications yet</p>
-              <Link to="/profile" className="btn btn-secondary mt-3">
+              <Link to="/profile" className="btn-secondary mt-3">
                 Check your profile settings
               </Link>
             </div>
@@ -837,7 +837,7 @@ const SellerDashboard = () => {
                 </p>
                 <div className="mt-3">
                   <button
-                    className="btn btn-primary btn-sm"
+                    className="btn-primary btn-sm"
                     onClick={() => {
                       setPaymentForm({
                         allocation_id: payment.allocation.allocation_id,
@@ -939,15 +939,15 @@ const SellerDashboard = () => {
       <div className="card">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Link to="/my-spaces" aria-label="Go to My Spaces" className="relative flex flex-col items-center justify-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+          <Link to="/my-spaces" aria-label="Go to My Spaces" className="tile">
             <Square className="w-8 h-8 text-primary-600 mb-2" />
             <span className="text-sm font-medium text-gray-900">My Spaces</span>
           </Link>
-          <Link to="/my-payments" aria-label="Go to Payments" className="relative flex flex-col items-center justify-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+          <Link to="/my-payments" aria-label="Go to Payments" className="tile">
             <CreditCard className="w-8 h-8 text-primary-600 mb-2" />
             <span className="text-sm font-medium text-gray-900">Payments</span>
           </Link>
-          <Link to="/my-notifications" aria-label="Go to Notifications" className="relative flex flex-col items-center justify-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+          <Link to="/my-notifications" aria-label="Go to Notifications" className="tile">
             <Bell className="w-8 h-8 text-primary-600 mb-2" />
             <span className="text-sm font-medium text-gray-900">Notifications</span>
             {unreadNotifications.length > 0 && (
@@ -956,7 +956,7 @@ const SellerDashboard = () => {
               </span>
             )}
           </Link>
-          <Link to="/profile" aria-label="Go to Profile" className="relative flex flex-col items-center justify-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+          <Link to="/profile" aria-label="Go to Profile" className="tile">
             <User className="w-8 h-8 text-primary-600 mb-2" />
             <span className="text-sm font-medium text-gray-900">Profile</span>
           </Link>
@@ -1125,10 +1125,10 @@ const SellerDashboard = () => {
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
-                <button type="button" aria-label="Cancel payment" onClick={() => setIsPaymentModalOpen(false)} className="btn btn-outline">
+                <button type="button" aria-label="Cancel payment" onClick={() => setIsPaymentModalOpen(false)} className="btn-outline">
                   Cancel
                 </button>
-                <button type="submit" aria-label="Submit payment" disabled={createPaymentMutation.isLoading || lanariMutation.isLoading} className="btn btn-primary">
+                <button type="submit" aria-label="Submit payment" disabled={createPaymentMutation.isLoading || lanariMutation.isLoading} className="btn-primary">
                   {createPaymentMutation.isLoading || lanariMutation.isLoading ? 'Processing...' : 'Pay Now'}
                 </button>
               </div>

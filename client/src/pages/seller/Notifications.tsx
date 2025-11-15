@@ -1,45 +1,53 @@
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { useAuthStore } from '../../store/authStore'
 import { notificationService } from '../../services/notificationService'
 import { sellerService } from '../../services/sellerService'
-import { Bell, Check } from 'lucide-react'
+import { Bell, ChevronDown, ChevronUp } from 'lucide-react'
 import { format } from 'date-fns'
+
+type NotificationItem = {
+  notification_id: number
+  title?: string
+  message?: string
+  created_at?: string
+  status?: 'read' | 'unread' | string
+  is_read?: boolean
+  notification_type?: 'payment' | 'allocation' | 'verification' | 'system' | string
+}
 
 const SellerNotifications = () => {
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
+  const [openId, setOpenId] = useState<number | null>(null)
 
-  // Fetch seller profile to get seller_id
   const { data: sellerProfile } = useQuery(
     ['seller-profile-for-notifs', user?.userId],
     () => sellerService.getByUserId(user!.userId),
-    { enabled: !!user?.userId, retry: false, onError: () => {} }
+    { enabled: !!user?.userId, retry: false }
   )
 
-  // Fetch notifications addressed to the user (system/admin/manager)
   const { data: notificationsUserData, isLoading: loadingUser } = useQuery(
     'seller-user-notifications',
     () => notificationService.getUserNotifications(),
-    { enabled: !!user?.userId, retry: false, onError: () => {} }
+    { enabled: !!user?.userId, retry: false }
   )
 
-  // Fetch notifications addressed to the seller_id (payment-related etc.)
   const sellerId = sellerProfile?.data?.seller_id
   const { data: notificationsSellerData, isLoading: loadingSeller } = useQuery(
     ['seller-id-notifications', sellerId],
     () => notificationService.getAll({ seller_id: sellerId }),
-    { enabled: !!sellerId, retry: false, onError: () => {} }
+    { enabled: !!sellerId, retry: false }
   )
 
-  // Merge and de-duplicate notifications
-  const listA = notificationsUserData?.data || []
-  const listB = notificationsSellerData?.data || []
-  const notificationsMap: Record<string, any> = {}
-  ;[...listA, ...listB].forEach((n: any) => {
+  const listA: NotificationItem[] = (notificationsUserData?.data || []) as NotificationItem[]
+  const listB: NotificationItem[] = (notificationsSellerData?.data || []) as NotificationItem[]
+  const notificationsMap: Record<string, NotificationItem> = {}
+  ;[...listA, ...listB].forEach((n) => {
     const key = String(n.notification_id || `${n.title}-${n.created_at}`)
     notificationsMap[key] = n
   })
-  const notifications = Object.values(notificationsMap).sort((a: any, b: any) => {
+  const notifications: NotificationItem[] = Object.values(notificationsMap).sort((a, b) => {
     const ta = a.created_at ? new Date(a.created_at).getTime() : 0
     const tb = b.created_at ? new Date(b.created_at).getTime() : 0
     return tb - ta
@@ -48,101 +56,132 @@ const SellerNotifications = () => {
   const markAsReadMutation = useMutation(
     (id: number) => notificationService.markAsRead(id),
     {
+      onMutate: async (id: number) => {
+        await queryClient.cancelQueries('seller-user-notifications')
+        await queryClient.cancelQueries('seller-id-notifications')
+        const prevUser = queryClient.getQueryData<unknown>('seller-user-notifications')
+        const prevSeller = queryClient.getQueryData<unknown>(['seller-id-notifications', sellerId])
+        const updateList = (data: unknown) => {
+          if (!data) return data
+          const d = data as { data?: NotificationItem[] }
+          const arr = d.data ?? (data as NotificationItem[])
+          const updated = arr.map(n => n.notification_id === id ? { ...n, is_read: true, status: 'read' } : n)
+          return Array.isArray(arr) ? updated : { ...(data as object), data: updated }
+        }
+        queryClient.setQueryData('seller-user-notifications', (data: unknown) => updateList(data))
+        queryClient.setQueryData(['seller-id-notifications', sellerId], (data: unknown) => updateList(data))
+        return { prevUser, prevSeller }
+      },
+      onError: (_err, _id, ctx?: { prevUser?: unknown; prevSeller?: unknown }) => {
+        if (ctx?.prevUser) queryClient.setQueryData('seller-user-notifications', ctx.prevUser)
+        if (ctx?.prevSeller) queryClient.setQueryData(['seller-id-notifications', sellerId], ctx.prevSeller)
+      },
       onSuccess: () => {
         queryClient.invalidateQueries('seller-user-notifications')
-        queryClient.invalidateQueries('seller-id-notifications')
+        queryClient.invalidateQueries(['seller-id-notifications', sellerId])
       },
     }
   )
 
   const markAllAsReadMutation = useMutation(async () => {
     const unreadIds = notifications
-      .filter((n: any) => n.status === 'unread' || !n.is_read)
-      .map((n: any) => n.notification_id)
+      .filter((n) => n.status === 'unread' || !n.is_read)
+      .map((n) => n.notification_id)
       .filter(Boolean)
     if (unreadIds.length > 0) {
       await notificationService.markMultipleAsRead(unreadIds as number[])
     }
     return { success: true }
   }, {
+    onMutate: async () => {
+      await queryClient.cancelQueries('seller-user-notifications')
+      await queryClient.cancelQueries(['seller-id-notifications', sellerId])
+      const updateAll = (data: unknown) => {
+        if (!data) return data
+        const d = data as { data?: NotificationItem[] }
+        const arr = d.data ?? (data as NotificationItem[])
+        const updated = arr.map(n => ({ ...n, is_read: true, status: 'read' }))
+        return Array.isArray(arr) ? updated : { ...(data as object), data: updated }
+      }
+      queryClient.setQueryData('seller-user-notifications', (data: unknown) => updateAll(data))
+      queryClient.setQueryData(['seller-id-notifications', sellerId], (data: unknown) => updateAll(data))
+    },
     onSuccess: () => {
       queryClient.invalidateQueries('seller-user-notifications')
-      queryClient.invalidateQueries('seller-id-notifications')
-    },
+      queryClient.invalidateQueries(['seller-id-notifications', sellerId])
+    }
   })
 
   if (loadingUser || loadingSeller) {
-    return <div className="text-center py-12">Loading notifications...</div>
+    return <div className="text-center py-12 text-gray-500">Loading notifications...</div>
   }
 
-  const unreadCount = notifications?.filter((n: any) => n.status === 'unread' || !n.is_read)?.length || 0
+  const unreadCount = notifications?.filter((n) => n.status === 'unread' || !n.is_read)?.length || 0
+
+  const handleToggle = (notification: NotificationItem) => {
+    const isUnread = notification.status === 'unread' || !notification.is_read
+    if (isUnread && notification.notification_id) {
+      markAsReadMutation.mutate(notification.notification_id)
+    }
+    setOpenId(openId === notification.notification_id ? null : notification.notification_id)
+  }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Notifications</h1>
+    <div className="container space-y-6">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Notifications</h1>
+          <p className="text-gray-600 mt-1">Unread: <span className="font-bold text-blue-900">{unreadCount}</span></p>
+        </div>
         {unreadCount > 0 && (
-          <button
-            onClick={() => markAllAsReadMutation.mutate()}
-            className="btn btn-secondary flex items-center space-x-2"
-          >
-            <Check size={18} />
-            <span>Mark All Read</span>
+          <button onClick={() => markAllAsReadMutation.mutate()} className="btn-primary">
+            Mark All Read
           </button>
         )}
       </div>
 
-      <div className="card">
-        <div className="space-y-4">
-          {notifications?.length > 0 ? (
-            notifications.map((notification: any) => {
-              const isUnread = notification.status === 'unread' || !notification.is_read
-              return (
-                <div
-                  key={notification.notification_id}
-                  className={`p-4 rounded-lg border-l-4 ${
-                    notification.notification_type === 'payment'
-                      ? 'bg-green-50 border-green-500'
-                      : notification.notification_type === 'allocation'
-                      ? 'bg-blue-50 border-blue-500'
-                      : notification.notification_type === 'verification'
-                      ? 'bg-yellow-50 border-yellow-500'
-                      : 'bg-gray-50 border-gray-500'
-                  } ${isUnread ? 'font-semibold' : ''}`}
-                  onClick={() => {
-                    if (isUnread && notification.notification_id) {
-                      markAsReadMutation.mutate(notification.notification_id)
-                    }
-                  }}
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900">{notification.title}</h3>
-                      <p className="text-gray-700 mt-1">{notification.message}</p>
-                      <p className="text-sm text-gray-500 mt-2">
-                        {notification.created_at &&
-                          format(new Date(notification.created_at), 'MMM dd, yyyy HH:mm')}
-                      </p>
-                    </div>
-                    {isUnread && (
-                      <Check className="ml-4 text-primary-600" size={20} />
-                    )}
+      <div className="space-y-4">
+        {notifications.length > 0 ? (
+          notifications.map((notification) => {
+            const isUnread = notification.status === 'unread' || !notification.is_read
+            const isOpen = openId === notification.notification_id
+            let typeColor = 'bg-gray-50 border-gray-300'
+            if (notification.notification_type === 'payment') typeColor = 'bg-green-50 border-green-500'
+            else if (notification.notification_type === 'allocation') typeColor = 'bg-blue-50 border-blue-500'
+            else if (notification.notification_type === 'verification') typeColor = 'bg-yellow-50 border-yellow-500'
+
+            return (
+              <div
+                key={notification.notification_id}
+                className={`card border-l-4 cursor-pointer transition hover:shadow-lg ${typeColor} ${isUnread ? 'font-semibold' : 'font-normal'}`}
+                onClick={() => handleToggle(notification)}
+              >
+                <div className="flex justify-between items-center p-4">
+                  <div>
+                    <h3 className="text-lg text-gray-900">{notification.title}</h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {notification.created_at && format(new Date(notification.created_at), 'MMM dd, yyyy HH:mm')}
+                    </p>
                   </div>
+                  {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                 </div>
-              )
-            })
-          ) : (
-            <div className="text-center py-12">
-              <Bell className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No notifications</p>
-            </div>
-          )}
-        </div>
+                {isOpen && (
+                  <div className="px-4 pb-4 text-gray-700 border-t border-gray-200">
+                    {notification.message}
+                  </div>
+                )}
+              </div>
+            )
+          })
+        ) : (
+          <div className="text-center py-12">
+            <Bell className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">No notifications</p>
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
 export default SellerNotifications
-
-

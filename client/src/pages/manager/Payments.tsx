@@ -12,10 +12,10 @@ import { format, subMonths } from 'date-fns'
 const ManagerPayments = () => {
   const { user } = useAuthStore()
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [methodFilter, setMethodFilter] = useState<string>('all')
-  const [dateFrom, setDateFrom] = useState<string>(format(subMonths(new Date(), 1), 'yyyy-MM-dd'))
-  const [dateTo, setDateTo] = useState<string>(format(new Date(), 'yyyy-MM-dd'))
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [methodFilter, setMethodFilter] = useState('all')
+  const [dateFrom, setDateFrom] = useState(format(subMonths(new Date(), 1), 'yyyy-MM-dd'))
+  const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [formData, setFormData] = useState<Partial<Payment>>({
     allocation_id: 0,
     seller_id: 0,
@@ -29,106 +29,45 @@ const ManagerPayments = () => {
   const managedZoneIds = user?.profile?.assigned_zones || []
   const managerId = (user as any)?.profile?.manager_id || (user as any)?.profile?.id || (user as any)?.manager_id || null
 
-  // Fetch allocations to filter payments by manager's zones
-  const { data: allocationsData } = useQuery(
-    ['allocations-for-payments', managedZoneIds],
-    () => allocationService.getAll(),
-    { retry: false, onError: () => {} }
-  )
+  const { data: allocationsData } = useQuery(['allocations-for-payments', managedZoneIds], () => allocationService.getAll(), { retry: false, onError: () => {} })
+  const { data: spacesData } = useQuery(['spaces-for-payments', managedZoneIds], () => spaceService.getAll(), { retry: false, onError: () => {} })
+  const { data: paymentsData, isLoading } = useQuery(['payments', statusFilter, methodFilter, dateFrom, dateTo, managedZoneIds], () => paymentService.getAll({
+    status: statusFilter !== 'all' ? statusFilter : undefined,
+    payment_method: methodFilter !== 'all' ? methodFilter : undefined,
+    date_from: dateFrom,
+    date_to: dateTo,
+  }), { retry: false, onError: () => {} })
+  const { data: sellersData } = useQuery(['sellers-list-payments', managerId], () => sellerService.getAll(managerId ? { manager_id: managerId } : undefined), { retry: false, onError: () => {} })
 
-  // Fetch spaces to get space-zone mapping
-  const { data: spacesData } = useQuery(
-    ['spaces-for-payments', managedZoneIds],
-    () => spaceService.getAll(),
-    { retry: false, onError: () => {} }
-  )
-
-  const { data: paymentsData, isLoading } = useQuery(
-    ['payments', statusFilter, methodFilter, dateFrom, dateTo, managedZoneIds],
-    () => paymentService.getAll({
-      status: statusFilter !== 'all' ? statusFilter : undefined,
-      payment_method: methodFilter !== 'all' ? methodFilter : undefined,
-      date_from: dateFrom,
-      date_to: dateTo,
-    }),
-    { retry: false, onError: () => {} }
-  )
-  
-  // We will compute revenue summaries from manager-filtered payments on the client side
-  
-  const { data: allocationsListData } = useQuery('allocations-list', () => allocationService.getAll(), {
-    retry: false,
-    onError: () => {},
-  })
-  
-  const { data: sellersData } = useQuery(['sellers-list-payments', managerId], () => sellerService.getAll(managerId ? { manager_id: managerId } : undefined), {
-    retry: false,
-    onError: () => {},
-  })
-  
   const allPayments = paymentsData?.data || []
-  const allAllocationsForPayments = allocationsData?.data || allocationsListData?.data || []
-  const allSpacesFromPayments = spacesData?.data || []
+  const allocations = allocationsData?.data || []
+  const allSpaces = spacesData?.data || []
   const sellers = sellersData?.data?.sellers || sellersData?.data || []
 
-  // Filter payments by managed zones (through allocations -> spaces -> zones)
-  const managedSpacesForPayments = managedZoneIds.length > 0
-    ? allSpacesFromPayments.filter((s: any) => managedZoneIds.includes(s.zone_id))
-    : allSpacesFromPayments
-  const managedSpaceIdsForPayments = managedSpacesForPayments.map((s: any) => s.space_id)
-  const managedAllocationsForPayments = managedZoneIds.length > 0
-    ? allAllocationsForPayments.filter((a: any) => managedSpaceIdsForPayments.includes(a.space_id) || (managerId && a.manager_id === managerId))
-    : allAllocationsForPayments
-  const managedAllocationIdsForPayments = managedAllocationsForPayments.map((a: any) => a.allocation_id)
+  const managedSpaces = managedZoneIds.length > 0 ? allSpaces.filter((s: any) => managedZoneIds.includes(s.zone_id)) : allSpaces
+  const managedAllocations = managedZoneIds.length > 0
+    ? allocations.filter((a: any) => managedSpaces.map((s: any) => s.space_id).includes(a.space_id) || (managerId && a.manager_id === managerId))
+    : allocations
   const payments = managedZoneIds.length > 0
-    ? allPayments.filter((p: Payment) => managedAllocationIdsForPayments.includes(p.allocation_id))
+    ? allPayments.filter((p: Payment) => managedAllocations.map((a: any) => a.allocation_id).includes(p.allocation_id))
     : allPayments
-  const allocations = managedZoneIds.length > 0 ? managedAllocationsForPayments : allAllocationsForPayments
-  // Compute totals from filtered payments to respect manager scope fully
+
   const totalRevenue = payments.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0)
-  const revenueByMethodLocal = payments.reduce((acc: Record<string, number>, p: any) => {
+  const revenueByMethod = payments.reduce((acc: Record<string, number>, p: any) => {
     const key = p.payment_method || 'unknown'
     acc[key] = (acc[key] || 0) + (Number(p.amount) || 0)
     return acc
   }, {})
 
-  const createMutation = useMutation((payment: Payment) => {
-    if (managedZoneIds.length > 0) {
-      const paymentAllocation = allocations.find((a: any) => a.allocation_id === payment.allocation_id)
-      if (paymentAllocation && !managedAllocationIdsForPayments.includes(payment.allocation_id)) {
-        toast.error('You can only create payments for allocations in your managed zones')
-        throw new Error('Unauthorized payment')
-      }
-    }
-    return paymentService.create(payment)
-  }, {
+  const createMutation = useMutation((payment: Payment) => paymentService.create(payment), {
     onSuccess: () => {
       queryClient.invalidateQueries('payments')
       toast.success('Payment recorded successfully')
       setIsModalOpen(false)
       resetForm()
     },
-    onError: (error: any) => {
-      if (error.message !== 'Unauthorized payment') {
-        toast.error(error.response?.data?.message || 'Failed to record payment')
-      }
-    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'Failed to record payment'),
   })
-
-  const updateStatusMutation = useMutation(
-    ({ id, status }: { id: number; status: string }) => paymentService.updateStatus(id, status),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('payments')
-        toast.success('Payment status updated successfully')
-      },
-      onError: (error: any) => {
-        if (error?.response?.status !== 403) {
-          toast.error(error.response?.data?.message || 'Failed to update payment status')
-        }
-      },
-    }
-  )
 
   const resetForm = () => {
     setFormData({
@@ -138,11 +77,6 @@ const ManagerPayments = () => {
       payment_method: 'mobile_money',
       payment_date: format(new Date(), 'yyyy-MM-dd'),
       status: 'completed',
-      mobile_money_number: '',
-      mobile_money_provider: '',
-      payment_reference: '',
-      transaction_id: '',
-      notes: '',
     })
   }
 
@@ -155,393 +89,125 @@ const ManagerPayments = () => {
     createMutation.mutate(formData as Payment)
   }
 
-  if (isLoading) {
-    return <div className="text-center py-12">Loading payments...</div>
-  }
+  if (isLoading) return <div className="flex justify-center items-center h-screen text-gray-500 text-lg">Loading payments...</div>
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Managed Payments</h1>
+    <div className="min-h-screen p-6 bg-gray-50">
+      <header className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-semibold text-gray-800">Managed Payments</h1>
         <button
-          onClick={() => {
-            resetForm()
-            setIsModalOpen(true)
-          }}
-          className="btn btn-primary flex items-center space-x-2"
+          onClick={() => { resetForm(); setIsModalOpen(true) }}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium rounded shadow hover:bg-blue-700 transition"
         >
-          <Plus size={20} />
-          <span>Record Payment</span>
+          <Plus size={18} /> Record Payment
         </button>
-      </div>
+      </header>
 
-      {/* Revenue Summary */}
-      {totalRevenue > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="card">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">${totalRevenue.toFixed(2)}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {format(new Date(dateFrom), 'MMM dd')} - {format(new Date(dateTo), 'MMM dd, yyyy')}
-                </p>
-              </div>
-              <div className="p-3 bg-green-100 rounded-lg">
-                <DollarSign className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
+      <section className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="p-4 bg-white rounded shadow flex items-center justify-between">
+          <div>
+            <p className="text-gray-500 text-sm">Total Revenue</p>
+            <h2 className="text-xl font-semibold">${totalRevenue.toFixed(2)}</h2>
           </div>
-          {Object.keys(revenueByMethodLocal).length > 0 && (
-            <div className="card col-span-2">
-              <p className="text-sm font-medium text-gray-600 mb-3">Revenue by Payment Method</p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {Object.entries(revenueByMethodLocal).map(([method, total]) => (
-                  <div key={method} className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-600 capitalize">{String(method || 'unknown').replace('_', ' ')}</p>
-                    <p className="text-lg font-bold text-gray-900">${Number(total).toFixed(2)}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <DollarSign size={28} className="text-green-500" />
         </div>
-      )}
-
-      {/* Filters */}
-      <div className="card mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="md:col-span-2 flex gap-2">
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="input"
-            />
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="input"
-            />
+        {Object.entries(revenueByMethod).map(([method, total]) => (
+          <div key={method} className="p-4 bg-white rounded shadow flex flex-col justify-center items-start">
+            <p className="text-gray-500 capitalize text-sm">{method.replace('_', ' ')}</p>
+            <h3 className="text-lg font-medium">${total.toFixed(2)}</h3>
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="input"
-          >
-            <option value="all">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="completed">Completed</option>
-            <option value="failed">Failed</option>
-            <option value="refunded">Refunded</option>
-          </select>
-          <select
-            value={methodFilter}
-            onChange={(e) => setMethodFilter(e.target.value)}
-            className="input"
-          >
-            <option value="all">All Methods</option>
-            <option value="mobile_money">Mobile Money</option>
-            <option value="bank_transfer">Bank Transfer</option>
-            <option value="cash">Cash</option>
-            <option value="card">Card</option>
-          </select>
-        </div>
-      </div>
+        ))}
+      </section>
 
-      {/* Payments Table */}
-      <div className="card">
-        <div className="overflow-x-auto">
-          <table className="table">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Payment ID</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Seller</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Amount</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Method</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Date</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {payments.length > 0 ? (
-                payments.map((payment: Payment) => {
-                  const seller = sellers.find((s: any) => (s.seller_id || s.user_id) === payment.seller_id)
-                  const owned = managerId && (payment as any).manager_id === managerId
-                  const methodLabel = payment.payment_method && payment.payment_method.trim().length > 0
-                    ? payment.payment_method
-                    : payment.mobile_money_provider === 'lanari'
-                    ? 'mobile_money_lanari'
-                    : payment.mobile_money_provider || 'unknown'
-                  return (
-                    <tr key={payment.payment_id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-4">#{payment.payment_id}</td>
-                      <td className="py-3 px-4">
-                        {seller?.business_name || seller?.full_name || seller?.user?.username || `Seller #${payment.seller_id}`}
-                      </td>
-                      <td className="py-3 px-4 font-medium">${Number(payment.amount || 0).toFixed(2)}</td>
-                      <td className="py-3 px-4 capitalize">{methodLabel.replace('_', ' ')}</td>
-                      <td className="py-3 px-4">
-                        {format(new Date(payment.payment_date), 'MMM dd, yyyy')}
-                      </td>
-                      <td className="py-3 px-4">
-                        {owned ? (
-                          <select
-                            value={payment.status}
-                            onChange={(e) => {
-                              if (window.confirm(`Change payment status to ${e.target.value}?`)) {
-                                updateStatusMutation.mutate({ id: payment.payment_id!, status: e.target.value })
-                              }
-                            }}
-                            className={`px-2 py-1 rounded text-xs font-medium border-0 ${
-                              payment.status === 'completed'
-                                ? 'bg-green-100 text-green-800'
-                                : payment.status === 'pending'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : payment.status === 'failed'
-                                ? 'bg-red-100 text-red-800'
-                                : 'bg-gray-100 text-gray-800'
-                            }`}
-                          >
-                            <option value="pending">Pending</option>
-                            <option value="completed">Completed</option>
-                            <option value="failed">Failed</option>
-                            <option value="refunded">Refunded</option>
-                          </select>
-                        ) : (
-                          <span
-                            className={`px-2 py-1 rounded text-xs font-medium ${
-                              payment.status === 'completed'
-                                ? 'bg-green-100 text-green-800'
-                                : payment.status === 'pending'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : payment.status === 'failed'
-                                ? 'bg-red-100 text-red-800'
-                                : 'bg-gray-100 text-gray-800'
-                            }`}
-                          >
-                            {payment.status}
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        {payment.status === 'completed' && (
-                          <button
-                            onClick={async () => {
-                              try {
-                                const blob = await paymentService.generateReceipt(payment.payment_id!)
-                                const url = window.URL.createObjectURL(blob)
-                                const a = document.createElement('a')
-                                a.href = url
-                                a.download = `receipt-${payment.payment_id}.pdf`
-                                a.click()
-                                window.URL.revokeObjectURL(url)
-                              } catch (error: any) {
-                                console.error('Receipt download failed:', error)
-                                toast.error('Receipt generation not available')
-                              }
-                            }}
-                            className="text-primary-600 hover:text-primary-700"
-                            title="Download Receipt"
-                          >
-                            <Download size={18} />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })
-              ) : (
-                <tr>
-                  <td colSpan={7} className="py-8 text-center text-gray-500">
-                    No payments found
+      <section className="flex flex-col md:flex-row gap-3 mb-6 items-center">
+        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="px-3 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="px-3 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="px-3 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400">
+          <option value="all">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="completed">Completed</option>
+          <option value="failed">Failed</option>
+          <option value="refunded">Refunded</option>
+        </select>
+        <select value={methodFilter} onChange={e => setMethodFilter(e.target.value)} className="px-3 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400">
+          <option value="all">All Methods</option>
+          <option value="mobile_money">Mobile Money</option>
+          <option value="bank_transfer">Bank Transfer</option>
+          <option value="cash">Cash</option>
+          <option value="card">Card</option>
+        </select>
+      </section>
+
+      <section className="overflow-x-auto bg-white rounded shadow">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-100">
+            <tr>
+              {['ID', 'Seller', 'Amount', 'Method', 'Date', 'Status', 'Actions'].map((title) => (
+                <th key={title} className="px-4 py-3 text-left text-sm font-medium text-gray-600">{title}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {payments.length > 0 ? payments.map(p => {
+              const seller = sellers.find((s: any) => (s.seller_id || s.user_id) === p.seller_id)
+              return (
+                <tr key={p.payment_id} className="hover:bg-gray-50">
+                  <td className="px-4 py-2 text-sm text-gray-700">#{p.payment_id}</td>
+                  <td className="px-4 py-2 text-sm text-gray-700">{seller?.business_name || seller?.full_name || `Seller #${p.seller_id}`}</td>
+                  <td className="px-4 py-2 text-sm text-gray-700">${Number(p.amount).toFixed(2)}</td>
+                  <td className="px-4 py-2 text-sm text-gray-700">{p.payment_method.replace('_',' ')}</td>
+                  <td className="px-4 py-2 text-sm text-gray-700">{format(new Date(p.payment_date), 'MMM dd, yyyy')}</td>
+                  <td className={`px-4 py-2 text-sm font-medium capitalize ${p.status === 'completed' ? 'text-green-600' : p.status === 'pending' ? 'text-yellow-500' : 'text-red-500'}`}>
+                    {p.status}
+                  </td>
+                  <td className="px-4 py-2">
+                    {p.status === 'completed' && (
+                      <button onClick={async () => {
+                        const blob = await paymentService.generateReceipt(p.payment_id!)
+                        const url = window.URL.createObjectURL(blob)
+                        const a = document.createElement('a')
+                        a.href = url
+                        a.download = `receipt-${p.payment_id}.pdf`
+                        a.click()
+                      }} className="p-2 rounded hover:bg-gray-100 transition">
+                        <Download size={16} />
+                      </button>
+                    )}
                   </td>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+              )
+            }) : (
+              <tr>
+                <td colSpan={7} className="px-4 py-6 text-center text-gray-500">No payments found</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </section>
 
-      {/* Create Payment Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 fade-in">
-          <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto slide-up">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Record Payment</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="label">Seller *</label>
-                  <select
-                    value={formData.seller_id}
-                    onChange={(e) => setFormData({ ...formData, seller_id: parseInt(e.target.value) })}
-                    className="input"
-                    required
-                  >
-                    <option value={0}>Select Seller</option>
-                    {sellers.map((seller: any) => (
-                      <option key={seller.seller_id || seller.user_id} value={seller.seller_id || seller.user_id}>
-                        {seller.business_name || seller.full_name || seller.user?.username || 'N/A'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="label">Allocation *</label>
-                  <select
-                    value={formData.allocation_id}
-                    onChange={(e) => {
-                      const id = parseInt(e.target.value)
-                      const alloc = allocations.find((a: any) => a.allocation_id === id)
-                      setFormData({
-                        ...formData,
-                        allocation_id: id,
-                        // auto-sync seller_id with selected allocation to avoid mismatches
-                        seller_id: alloc ? alloc.seller_id : formData.seller_id,
-                      })
-                    }}
-                    className="input"
-                    required
-                  >
-                    <option value={0}>Select Allocation</option>
-                    {allocations
-                      .filter((a: any) => !formData.seller_id || a.seller_id === formData.seller_id)
-                      .map((allocation: any) => (
-                        <option key={allocation.allocation_id} value={allocation.allocation_id}>
-                          Allocation #{allocation.allocation_id} - Space {allocation.space_id}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="label">Amount ($) *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.amount || ''}
-                    onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
-                    className="input"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="label">Payment Method *</label>
-                  <select
-                    value={formData.payment_method}
-                    onChange={(e) => setFormData({ ...formData, payment_method: e.target.value as any })}
-                    className="input"
-                    required
-                  >
-                    <option value="mobile_money">Mobile Money</option>
-                    <option value="bank_transfer">Bank Transfer</option>
-                    <option value="cash">Cash</option>
-                    <option value="card">Card</option>
-                  </select>
-                </div>
-                {formData.payment_method === 'mobile_money' && (
-                  <>
-                    <div>
-                      <label className="label">Mobile Money Number *</label>
-                      <input
-                        type="tel"
-                        value={formData.mobile_money_number || ''}
-                        onChange={(e) => setFormData({ ...formData, mobile_money_number: e.target.value })}
-                        className="input"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="label">Mobile Money Provider</label>
-                      <select
-                        value={formData.mobile_money_provider || ''}
-                        onChange={(e) => setFormData({ ...formData, mobile_money_provider: e.target.value })}
-                        className="input"
-                      >
-                        <option value="">Select Provider</option>
-                        <option value="mtn">MTN</option>
-                        <option value="airtel">Airtel</option>
-                        <option value="orange">Orange</option>
-                      </select>
-                    </div>
-                  </>
-                )}
-                <div>
-                  <label className="label">Payment Date *</label>
-                  <input
-                    type="date"
-                    value={formData.payment_date}
-                    onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
-                    className="input"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="label">Period Start (optional)</label>
-                  <input
-                    type="date"
-                    value={(formData as any).payment_period_start || ''}
-                    onChange={(e) => setFormData({ ...formData, payment_period_start: e.target.value } as any)}
-                    className="input"
-                    placeholder="Start of covered period"
-                  />
-                </div>
-                <div>
-                  <label className="label">Period End (optional)</label>
-                  <input
-                    type="date"
-                    value={(formData as any).payment_period_end || ''}
-                    onChange={(e) => setFormData({ ...formData, payment_period_end: e.target.value } as any)}
-                    className="input"
-                    placeholder="End of covered period"
-                  />
-                </div>
-                <div>
-                  <label className="label">Payment Reference</label>
-                  <input
-                    type="text"
-                    value={formData.payment_reference || ''}
-                    onChange={(e) => setFormData({ ...formData, payment_reference: e.target.value })}
-                    className="input"
-                    placeholder="Transaction reference number"
-                  />
-                </div>
-                <div>
-                  <label className="label">Transaction ID</label>
-                  <input
-                    type="text"
-                    value={formData.transaction_id || ''}
-                    onChange={(e) => setFormData({ ...formData, transaction_id: e.target.value })}
-                    className="input"
-                    placeholder="Transaction ID"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="label">Notes</label>
-                  <textarea
-                    value={formData.notes || ''}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    className="input"
-                    rows={3}
-                    placeholder="Additional notes"
-                  />
-                </div>
-              </div>
-              <div className="flex space-x-3 pt-4">
-                <button type="submit" className="btn btn-primary">
-                  Record Payment
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsModalOpen(false)
-                    resetForm()
-                  }}
-                  className="btn btn-secondary"
-                >
-                  Cancel
-                </button>
+        <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50">
+          <div className="bg-white p-6 rounded shadow-md w-full max-w-lg">
+            <h2 className="text-xl font-semibold mb-4">Record Payment</h2>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              <select value={formData.seller_id} onChange={e => setFormData({...formData, seller_id: parseInt(e.target.value)})} required className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <option value={0}>Select Seller</option>
+                {sellers.map((s: any) => <option key={s.seller_id || s.user_id} value={s.seller_id || s.user_id}>{s.business_name || s.full_name}</option>)}
+              </select>
+              <select value={formData.allocation_id} onChange={e => setFormData({...formData, allocation_id: parseInt(e.target.value)})} required className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <option value={0}>Select Allocation</option>
+                {managedAllocations.map((a: any) => <option key={a.allocation_id} value={a.allocation_id}>Allocation #{a.allocation_id} - Space {a.space_id}</option>)}
+              </select>
+              <input type="number" step="0.01" placeholder="Amount ($)" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: parseFloat(e.target.value) || 0})} required className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"/>
+              <select value={formData.payment_method} onChange={e => setFormData({...formData, payment_method: e.target.value as any})} required className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <option value="mobile_money">Mobile Money</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="cash">Cash</option>
+                <option value="card">Card</option>
+              </select>
+              <div className="flex justify-end gap-2">
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">Record Payment</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 transition">Cancel</button>
               </div>
             </form>
           </div>
@@ -552,4 +218,3 @@ const ManagerPayments = () => {
 }
 
 export default ManagerPayments
-

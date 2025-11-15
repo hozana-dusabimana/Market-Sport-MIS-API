@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { useQuery } from 'react-query'
 import { reportService } from '../../services/reportService'
-import { Calendar, Download, FileText } from 'lucide-react'
-import { format, subDays, subMonths, startOfWeek, startOfMonth } from 'date-fns'
-import { demoReports } from '../../utils/demoData'
+import { userService } from '../../services/userService'
+import { sellerService } from '../../services/sellerService'
+import { paymentService } from '../../services/paymentService'
+import { allocationService } from '../../services/allocationService'
+import { Download } from 'lucide-react'
+import { format, subDays, startOfWeek } from 'date-fns'
 import {
   BarChart,
   Bar,
@@ -29,13 +32,13 @@ const Reports = () => {
   const { data: dailyReport, isLoading: dailyLoading } = useQuery(
     ['daily-report', date],
     () => reportService.getDailyReport(date),
-    { enabled: reportType === 'daily' }
+    { enabled: reportType === 'daily', retry: false }
   )
 
   const { data: weeklyReport, isLoading: weeklyLoading } = useQuery(
     ['weekly-report', weekStart],
     () => reportService.getWeeklyReport(weekStart),
-    { enabled: reportType === 'weekly' }
+    { enabled: reportType === 'weekly', retry: false }
   )
 
   const { data: monthlyReport, isLoading: monthlyLoading } = useQuery(
@@ -44,7 +47,7 @@ const Reports = () => {
       const [year, monthNum] = month.split('-')
       return reportService.getMonthlyReport(monthNum, year)
     },
-    { enabled: reportType === 'monthly' }
+    { enabled: reportType === 'monthly', retry: false }
   )
 
   const { data: occupancyReportData } = useQuery(
@@ -54,10 +57,7 @@ const Reports = () => {
         format(subDays(new Date(), 30), 'yyyy-MM-dd'),
         format(new Date(), 'yyyy-MM-dd')
       ),
-    {
-      retry: false,
-      onError: () => {},
-    }
+    { retry: false }
   )
 
   const { data: paymentReportData } = useQuery(
@@ -67,16 +67,19 @@ const Reports = () => {
         format(subDays(new Date(), 30), 'yyyy-MM-dd'),
         format(new Date(), 'yyyy-MM-dd')
       ),
-    {
-      retry: false,
-      onError: () => {},
-    }
+    { retry: false }
   )
 
   // Extract data from backend responses
-  const occupancyReport = occupancyReportData?.data || { data: demoReports.occupancy }
-  const paymentReportDataFromBackend = paymentReportData?.data || paymentReportData
-  const paymentReport = paymentReportDataFromBackend || { data: demoReports.payments, by_method: demoReports.by_method }
+  const occupancyReport = occupancyReportData?.data || occupancyReportData || { occupied: 0, available: 0 }
+  const paymentReport = paymentReportData?.data || paymentReportData || { data: [], by_method: [] }
+
+  const { data: userStatsData } = useQuery('user-statistics', () => userService.getStatistics(), { retry: false })
+  const { data: sellerCountsData } = useQuery('seller-status-count', () => sellerService.getCountByStatus(), { retry: false })
+  const dateFrom = format(subDays(new Date(), 30), 'yyyy-MM-dd')
+  const dateTo = format(new Date(), 'yyyy-MM-dd')
+  const { data: revenueByZoneData } = useQuery(['revenue-by-zone', dateFrom, dateTo], () => paymentService.getRevenueByZone({ date_from: dateFrom, date_to: dateTo }), { retry: false })
+  const { data: allocationsData } = useQuery('allocations', () => allocationService.getAll(), { retry: false })
 
   const isLoading = dailyLoading || weeklyLoading || monthlyLoading
 
@@ -101,15 +104,41 @@ const Reports = () => {
   }
 
   const COLORS = ['#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
+  const safeNumber = (val: unknown) => Number(val || 0) || 0
+  const toNumber = (v: unknown) => {
+    const n = Number(v)
+    return Number.isFinite(n) ? n : 0
+  }
+  const asArray = <T,>(v: unknown): T[] => {
+    if (Array.isArray(v)) return v as T[]
+    const d = (v as { data?: unknown })?.data
+    return Array.isArray(d) ? (d as T[]) : []
+  }
+  const userStats = (userStatsData?.data || userStatsData || {}) as Record<string, unknown>
+  const sellerCounts = (sellerCountsData?.data || sellerCountsData || {}) as Record<string, unknown>
+  const revenueByZone = asArray<{ zone_name?: string; total_amount?: number; total?: number }>(revenueByZoneData)
+  const allocationsList = asArray<{ status?: string }>(allocationsData)
+  const userTypeSeries = ['admin', 'manager', 'seller'].map((t) => ({ type: t, count: toNumber(userStats[`total_${t}s`]) }))
+  const activeInactiveSeries = ['active', 'inactive', 'suspended'].map((s) => ({ status: s, count: toNumber(userStats[`${s}_users`]) }))
+  const sellerStatusSeries = Object.entries(sellerCounts).map(([status, val]) => ({ status, count: toNumber(val) }))
+  const revenueZoneSeries = revenueByZone.map((r) => ({ zone: String(r.zone_name || 'Unknown'), amount: toNumber(r.total_amount ?? r.total) }))
+  const allocationStatusCounts = (() => {
+    const m: Record<string, number> = {}
+    for (const a of allocationsList) {
+      const k = String(a.status || 'unknown')
+      m[k] = (m[k] || 0) + 1
+    }
+    return Object.entries(m).map(([status, count]) => ({ status, count }))
+  })()
 
   return (
-    <div>
+    <div className="container">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Reports & Analytics</h1>
         <div className="flex space-x-2">
           <select
             value={reportType}
-            onChange={(e) => setReportType(e.target.value as any)}
+            onChange={(e) => setReportType(e.target.value as 'daily' | 'weekly' | 'monthly')}
             className="input w-auto"
           >
             <option value="daily">Daily</option>
@@ -118,7 +147,7 @@ const Reports = () => {
           </select>
           <button
             onClick={() => handleExport(reportType)}
-            className="btn btn-primary flex items-center space-x-2"
+            className="btn-primary flex items-center space-x-2"
           >
             <Download size={18} />
             <span>Export</span>
@@ -221,6 +250,116 @@ const Reports = () => {
               </BarChart>
             </ResponsiveContainer>
           </div>
+
+          <div className="card">
+            <h2 className="text-xl font-semibold mb-4">Revenue by Zone</h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={revenueZoneSeries}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="zone" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="amount" fill="#10b981" name="Amount ($)" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="card">
+            <h2 className="text-xl font-semibold mb-4">Seller Status Distribution</h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={sellerStatusSeries}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="status" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="count" fill="#8b5cf6" name="Count" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="card">
+            <h2 className="text-xl font-semibold mb-4">Allocations by Status</h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={allocationStatusCounts}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="status" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="count" fill="#f59e0b" name="Count" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="card lg:col-span-2">
+            <h2 className="text-xl font-semibold mb-4">Users Overview</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-600">Admins</p>
+                <p className="text-2xl font-bold text-gray-900">{userTypeSeries.find(u => u.type === 'admin')?.count || 0}</p>
+              </div>
+              <div className="bg-green-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-600">Managers</p>
+                <p className="text-2xl font-bold text-gray-900">{userTypeSeries.find(u => u.type === 'manager')?.count || 0}</p>
+              </div>
+              <div className="bg-purple-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-600">Sellers</p>
+                <p className="text-2xl font-bold text-gray-900">{userTypeSeries.find(u => u.type === 'seller')?.count || 0}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <div className="bg-emerald-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-600">Active Users</p>
+                <p className="text-2xl font-bold text-gray-900">{activeInactiveSeries.find(s => s.status === 'active')?.count || 0}</p>
+              </div>
+              <div className="bg-yellow-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-600">Inactive Users</p>
+                <p className="text-2xl font-bold text-gray-900">{activeInactiveSeries.find(s => s.status === 'inactive')?.count || 0}</p>
+              </div>
+              <div className="bg-red-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-600">Suspended Users</p>
+                <p className="text-2xl font-bold text-gray-900">{activeInactiveSeries.find(s => s.status === 'suspended')?.count || 0}</p>
+              </div>
+            </div>
+          </div>
+
+          {(dailyReport || weeklyReport || monthlyReport) && (
+            <div className="card lg:col-span-2">
+              <h2 className="text-xl font-semibold mb-4">Report Summary</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {['daily', 'weekly', 'monthly'].map(
+                  (type) =>
+                    reportType === type &&
+                    (() => {
+                      type SummaryData = { total_revenue?: number; total_payments?: number; active_allocations?: number }
+                      const raw: unknown =
+                        type === 'daily' ? dailyReport : type === 'weekly' ? weeklyReport : monthlyReport
+                      const container = raw as { data?: SummaryData }
+                      const data: SummaryData | undefined = container?.data ?? (raw as SummaryData | undefined)
+                      if (!data) return null
+                      return (
+                        <>
+                          <div className="bg-blue-50 p-4 rounded-lg">
+                            <p className="text-sm text-gray-600">Total Revenue</p>
+                            <p className="text-2xl font-bold text-gray-900">${safeNumber(data.total_revenue).toFixed(2)}</p>
+                          </div>
+                          <div className="bg-green-50 p-4 rounded-lg">
+                            <p className="text-sm text-gray-600">Total Payments</p>
+                            <p className="text-2xl font-bold text-gray-900">{safeNumber(data.total_payments)}</p>
+                          </div>
+                          <div className="bg-purple-50 p-4 rounded-lg">
+                            <p className="text-sm text-gray-600">Active Allocations</p>
+                            <p className="text-2xl font-bold text-gray-900">{safeNumber(data.active_allocations)}</p>
+                          </div>
+                        </>
+                      )
+                    })()
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
