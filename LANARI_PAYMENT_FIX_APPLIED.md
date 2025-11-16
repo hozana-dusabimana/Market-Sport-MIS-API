@@ -71,7 +71,7 @@ this.apiSecret = process.env.LANARI_API_SECRET || '';
      api_secret: "cf034117...",    ✅ Now has value!
      amount: 1000,
      customer_phone: "250788123456",
-     currency: "RWF",
+     currency: "",
      description: "..."
    }
 5. Lanari processes payment ✅ (Now works!)

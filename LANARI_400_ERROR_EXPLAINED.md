@@ -95,9 +95,9 @@ The error shows your gateway is returning status 500 with:
 'Invalid JSON response from gateway: Syntax error'
 
 Test request:
-- Amount: 1000 RWF
+- Amount: 1000 
 - Phone: 250788123456
-- Currency: RWF
+- Currency: 
 - Description: Test payment
 
 Is there a known issue with your gateway?

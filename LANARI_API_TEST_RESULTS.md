@@ -12,7 +12,7 @@ curl -X POST https://www.lanari.rw/lanari_pay/api/payment/process.php \
     "api_secret": "cf034117f2ecf6c5048115fc710d27e51284a9cd57223d9bf689ccb0f08a1368d4a3e282a8071a528ab660b564da11a4fa0f661da56b0ed2992d93569b1d5488",
     "amount": 1000,
     "customer_phone": "250788123456",
-    "currency": "RWF",
+    "currency": "",
     "description": "Payment for order 123"
   }'
 ```

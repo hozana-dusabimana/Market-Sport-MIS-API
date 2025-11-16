@@ -99,23 +99,23 @@
 
 ### Example 1: Standard Space (25m²)
 ```
-Daily Rate:   3,000  RWF
-Weekly Rate:  18,000 RWF  (3,000 × 6 = 14.3% discount)
-Monthly Rate: 75,000 RWF  (3,000 × 25 = 16.7% discount)
+Daily Rate:   3,000  
+Weekly Rate:  18,000   (3,000 × 6 = 14.3% discount)
+Monthly Rate: 75,000   (3,000 × 25 = 16.7% discount)
 ```
 
 ### Example 2: Premium Space (40m²)
 ```
-Daily Rate:   8,000  RWF
-Weekly Rate:  50,000 RWF  (8,000 × 6.25 = 1.6% discount)
-Monthly Rate: 200,000 RWF (8,000 × 25 = 0% discount = bulk price)
+Daily Rate:   8,000  
+Weekly Rate:  50,000   (8,000 × 6.25 = 1.6% discount)
+Monthly Rate: 200,000  (8,000 × 25 = 0% discount = bulk price)
 ```
 
 ### Example 3: Corner Space (50m²)
 ```
-Daily Rate:   10,000 RWF
-Weekly Rate:  65,000 RWF  (10,000 × 6.5 = 0% discount = premium)
-Monthly Rate: 250,000 RWF (10,000 × 25 = 0% discount = premium)
+Daily Rate:   10,000 
+Weekly Rate:  65,000   (10,000 × 6.5 = 0% discount = premium)
+Monthly Rate: 250,000  (10,000 × 25 = 0% discount = premium)
 ```
 
 ---

@@ -137,7 +137,7 @@ I'm sending:
   "api_secret": "...",
   "amount": 1000,
   "customer_phone": "250788123456",
-  "currency": "RWF",
+  "currency": "",
   "description": "Payment"
 }
 

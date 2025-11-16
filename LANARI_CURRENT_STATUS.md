@@ -92,7 +92,7 @@ $body = @{
   "api_secret"="cf034117f2ecf6c5048115fc710d27e51284a9cd57223d9bf689ccb0f08a1368d4a3e282a8071a528ab660b564da11a4fa0f661da56b0ed2992d93569b1d5488"
   "amount"=5
   "customer_phone"="250790989830"
-  "currency"="RWF"
+  "currency"=""
   "description"="Test"
   "reference_id"="TEST-123"
 } | ConvertTo-Json
@@ -118,7 +118,7 @@ Invoke-WebRequest -Uri "https://www.lanari.rw/lanari_pay/api/payment/process.php
 ✅ 200 OK Response received
 ✅ Transaction ID: afe8c6cc-78b1-4cf8-b2fa-23b9aa450f65
 ✅ Status: pending
-✅ Amount: 1000 RWF
+✅ Amount: 1000 
 ```
 
 ### Now (BROKEN)
@@ -195,7 +195,7 @@ Allocation #3:
 7. **Alternative Payment Methods**
    - Implement MTN Mobile Money
    - Implement Airtel Money
-   - Implement other RWF payment gateways
+   - Implement other  payment gateways
 
 ### Long Term
 8. **Webhook Implementation**

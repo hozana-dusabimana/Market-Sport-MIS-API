@@ -71,7 +71,7 @@
                     │   api_secret: "...",
                     │   amount: 1000,
                     │   customer_phone: "250788123456",
-                    │   currency: "RWF",
+                    │   currency: "",
                     │   description: "...",
                     │   reference_id: "..."
                     │ }
