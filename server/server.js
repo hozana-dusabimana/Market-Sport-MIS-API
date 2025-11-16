@@ -17,4 +17,5 @@ server.listen(PORT, () => {
   console.log(`  Database: ${config.database.name}`);
   console.log(`  Socket.IO: Enabled`);
   console.log(`═══════════════════════════════════════`);
-});
+}
+);

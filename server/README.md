@@ -78,4 +78,4 @@ Base URL: \`http://localhost:3000/api/v1\`
 - Password: admin123
 
 **Change these credentials immediately after first login!**
-\`\`\`
+`\`\`

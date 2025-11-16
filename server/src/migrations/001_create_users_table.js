@@ -22,4 +22,3 @@ export async function up(connection) {
 
 export async function down(connection) {
   await connection.query('DROP TABLE IF EXISTS users');
-}

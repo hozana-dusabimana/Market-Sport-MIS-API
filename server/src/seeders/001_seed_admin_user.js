@@ -22,4 +22,3 @@ export async function seed(connection) {
   `, [result.insertId]);
 
   console.log('  → Admin user created (username: admin, password: admin123)');
-}

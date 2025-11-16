@@ -86,7 +86,7 @@ class NotificationService {
           user_id: sellerRows[0].user_id,
           seller_id,
           title: 'Payment Processed',
-          message: `Your payment of ${amount} RWF has been ${statusMessage}.`,
+          message: `Your payment of ${amount}  has been ${statusMessage}.`,
           notification_type: 'payment',
           related_id: payment_id,
           action_url: `/payments/${payment_id}`

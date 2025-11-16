@@ -9,7 +9,7 @@ async function testDirectPayment() {
       amount: 5,
       customer_phone: '0790989830',
       description: 'Direct Service Test',
-      currency: 'RWF',
+      currency: '',
       reference_id: `DIRECT-${Date.now()}`
     };
 

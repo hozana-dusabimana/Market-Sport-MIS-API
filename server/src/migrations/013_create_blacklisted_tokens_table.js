@@ -13,4 +13,3 @@ PRIMARY KEY (id)
 
 export async function down(connection) {
   await connection.query('DROP TABLE IF EXISTS blacklisted_tokens');
-}

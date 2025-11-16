@@ -20,7 +20,7 @@ const testPayloads = [
       api_secret: apiSecret,
       amount: 1000,
       customer_phone: '250788123456',
-      currency: 'RWF',
+      currency: '',
       description: 'Test'
     }
   },
@@ -30,7 +30,7 @@ const testPayloads = [
       api_key: apiKey,
       amount: 1000,
       customer_phone: '250788123456',
-      currency: 'RWF',
+      currency: '',
       description: 'Test'
     },
     headers: {
@@ -39,7 +39,7 @@ const testPayloads = [
   },
   {
     name: 'URL encoded format',
-    payload: `api_key=${apiKey}&api_secret=${apiSecret}&amount=1000&customer_phone=250788123456&currency=RWF&description=Test`,
+    payload: `api_key=${apiKey}&api_secret=${apiSecret}&amount=1000&customer_phone=250788123456&currency=&description=Test`,
     isUrlEncoded: true
   },
   {
@@ -48,7 +48,7 @@ const testPayloads = [
       api_key: apiKey,
       amount: 1000,
       customer_phone: '250788123456',
-      currency: 'RWF',
+      currency: '',
       description: 'Test',
       timestamp: Math.floor(Date.now() / 1000),
       signature: generateSignature(apiKey, apiSecret)

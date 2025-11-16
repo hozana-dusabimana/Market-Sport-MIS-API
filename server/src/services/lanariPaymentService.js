@@ -36,7 +36,7 @@ class LanariPaymentService {
 
   async processPayment(paymentData) {
     try {
-      const { amount, customer_phone, description, currency = 'RWF' } = paymentData;
+      const { amount, customer_phone, description, currency = '' } = paymentData;
 
       if (!amount || amount <= 0) {
         throw new Error('Invalid payment amount');
@@ -63,7 +63,7 @@ class LanariPaymentService {
         description: cleanDescription
       };
 
-      console.log('[PAYMENT] Processing payment:', amount, 'RWF for', formattedPhone);
+      console.log('[PAYMENT] Processing payment:', amount, ' for', formattedPhone);
 
       const response = await axios.post(this.apiUrl, requestData, {
         headers: {

@@ -44,4 +44,3 @@ export async function up(connection) {
 export async function down(connection) {
   await connection.query('DROP TABLE IF EXISTS spaces');
   await connection.query('DROP TABLE IF EXISTS zones');
-}
