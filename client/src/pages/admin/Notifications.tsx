@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from 'react-query'
 import { notificationService, Notification } from '../../services/notificationService'
 import toast from 'react-hot-toast'
+import { useNavigate } from 'react-router-dom'
 
 const Notifications = () => {
   const [formData, setFormData] = useState<Partial<Notification>>({
@@ -13,6 +14,7 @@ const Notifications = () => {
   })
 
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
 
   const createMutation = useMutation(
     (notification: Notification) => notificationService.create(notification),
@@ -47,15 +49,27 @@ const Notifications = () => {
   }
 
   return (
-    <div className="container space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Send Notifications</h1>
-        <p className="text-gray-600 mt-1">Send system messages to users and sellers. Leave IDs empty to broadcast.</p>
-      </div>
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-40">
+      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-6">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="btn-secondary px-3 py-1 text-sm"
+            >
+              Back
+            </button>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Send Notifications</h1>
+              <p className="text-gray-600 mt-1">Send system messages to users and sellers. Leave IDs empty to broadcast.</p>
+            </div>
+          </div>
+        </div>
 
-      <div className="card">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Compose</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="card">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Compose</h2>
+          <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="label">User ID (optional)</label>
@@ -118,6 +132,7 @@ const Notifications = () => {
             <button type="button" onClick={resetForm} className="btn-secondary flex-1">Reset</button>
           </div>
         </form>
+        </div>
       </div>
     </div>
   )

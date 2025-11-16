@@ -105,6 +105,7 @@ const SellerDashboard = () => {
 
         const apiSuccess = res?.success !== undefined ? res.success : true
         const status = res?.data?.status || res?.status
+        const ussdCode = res?.data?.ussd_code || res?.data?.ussd || res?.ussd_code || res?.ussd
 
         if (!apiSuccess) {
           const msg = res?.message || 'Failed to initiate mobile money payment'
@@ -125,7 +126,11 @@ const SellerDashboard = () => {
             toast.success('Payment completed. Failed to extend period automatically.')
           }
         } else {
-          toast.success('Payment initiated. Please approve the USSD prompt on your phone. Status: pending')
+          if (ussdCode) {
+            toast.success(`Payment initiated. Dial ${ussdCode} on your phone to complete the payment.`)
+          } else {
+            toast.success('Payment initiated. Please approve the USSD prompt on your phone. Status: pending')
+          }
         }
 
         setIsPaymentModalOpen(false)
@@ -964,12 +969,19 @@ const SellerDashboard = () => {
       </div>
 
       {isPaymentModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
             <h2 className="text-2xl font-bold mb-4">Make a Payment</h2>
             <form
               onSubmit={(e) => {
                 e.preventDefault()
+                const amountValue = Number(paymentForm.amount) || 0
+
+                if (paymentForm.payment_method === 'mobile_money' && amountValue < 100) {
+                  toast.error('Minimum mobile money payment is 100 .')
+                  return
+                }
+
                 if (paymentForm.payment_method === 'mobile_money' && paymentForm.mobile_money_number) {
                   const alloc = activeAllocations.find(
                     (a: any) => a.allocation_id === paymentForm.allocation_id
@@ -986,7 +998,7 @@ const SellerDashboard = () => {
                   lanariMutation.mutate({
                     allocation_id: paymentForm.allocation_id!,
                     seller_id: sellerId!,
-                    amount: Number(paymentForm.amount) || 0,
+                    amount: amountValue,
                     customer_phone: paymentForm.mobile_money_number,
                     payment_period_start: periodStart,
                     payment_period_end: periodEnd,
@@ -1008,127 +1020,138 @@ const SellerDashboard = () => {
                     const nextEnd = alloc ? computeNextPeriodEnd(alloc) : null
                     return (
                       <div className="flex flex-col gap-1">
-                        <span>Suggested amount: <strong>${Number(suggested).toFixed(2)}</strong></span>
+                        <span>
+                          Suggested amount: <strong>${Number(suggested).toFixed(2)}</strong>
+                        </span>
                         {nextEnd && (
-                          <span>New period ends on: <strong>{format(nextEnd, 'MMM dd, yyyy')}</strong></span>
+                          <span>
+                            New period ends on: <strong>{format(nextEnd, 'MMM dd, yyyy')}</strong>
+                          </span>
                         )}
                       </div>
                     )
                   })()}
                 </div>
               )}
-              <div>
-                <label className="label">Allocation *</label>
-                <select
-                  value={paymentForm.allocation_id || 0}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, allocation_id: parseInt(e.target.value) })}
-                  className="input"
-                  required
-                >
-                  <option value={0}>Select Allocation</option>
-                  {activeAllocations.map((a: any) => (
-                    <option key={a.allocation_id} value={a.allocation_id}>
-                      Allocation #{a.allocation_id} - Space {a.space_id}
-                    </option>
-                  ))}
-                </select>
-              </div>
 
-              <div>
-                <label className="label">Amount ($) *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={paymentForm.amount || ''}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, amount: parseFloat(e.target.value) })}
-                  className="input"
-                  required
-                />
-              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Allocation *</label>
+                  <select
+                    value={paymentForm.allocation_id || 0}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, allocation_id: parseInt(e.target.value) })}
+                    className="input"
+                    required
+                  >
+                    <option value={0}>Select Allocation</option>
+                    {activeAllocations.map((a: any) => (
+                      <option key={a.allocation_id} value={a.allocation_id}>
+                        Allocation #{a.allocation_id} - Space {a.space_id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <div>
-                <label className="label">Payment Method *</label>
-                <select
-                  value={paymentForm.payment_method as any}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, payment_method: e.target.value as any })}
-                  className="input"
-                  required
-                >
-                  <option value="mobile_money">Mobile Money</option>
-                  <option value="bank_transfer">Bank Transfer</option>
-                  <option value="cash">Cash</option>
-                  <option value="card">Card</option>
-                </select>
-              </div>
+                <div>
+                  <label className="label">Amount ($) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={paymentForm.amount || ''}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, amount: parseFloat(e.target.value) })}
+                    className="input"
+                    required
+                  />
+                </div>
 
-              {paymentForm.payment_method === 'mobile_money' && (
-                <>
-                  <div>
-                    <label className="label">Mobile Money Number *</label>
-                    <input
-                      type="tel"
-                      value={paymentForm.mobile_money_number || ''}
-                      onChange={(e) => setPaymentForm({ ...paymentForm, mobile_money_number: e.target.value })}
-                      className="input"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="label">Provider</label>
-                    <select
-                      value={paymentForm.mobile_money_provider || ''}
-                      onChange={(e) => setPaymentForm({ ...paymentForm, mobile_money_provider: e.target.value })}
-                      className="input"
-                    >
-                      <option value="">Select Provider</option>
-                      <option value="mtn">MTN</option>
-                      <option value="airtel">Airtel</option>
-                      <option value="orange">Orange</option>
-                    </select>
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    You will receive a USSD prompt on your phone to approve this payment.
-                  </div>
-                </>
-              )}
+                <div>
+                  <label className="label">Payment Method *</label>
+                  <select
+                    value={paymentForm.payment_method as any}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, payment_method: e.target.value as any })}
+                    className="input"
+                    required
+                  >
+                    <option value="mobile_money">Mobile Money</option>
+                  </select>
+                </div>
 
-              <div>
-                <label className="label">Payment Date *</label>
-                <input
-                  type="date"
-                  value={paymentForm.payment_date as string}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, payment_date: e.target.value })}
-                  className="input"
-                  required
-                />
-              </div>
+                {paymentForm.payment_method === 'mobile_money' && (
+                  <>
+                    <div>
+                      <label className="label">Mobile Money Number *</label>
+                      <input
+                        type="tel"
+                        value={paymentForm.mobile_money_number || ''}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, mobile_money_number: e.target.value })}
+                        className="input"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Provider</label>
+                      <select
+                        value={paymentForm.mobile_money_provider || ''}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, mobile_money_provider: e.target.value })}
+                        className="input"
+                      >
+                        <option value="">Select Provider</option>
+                        <option value="mtn">MTN</option>
+                        <option value="airtel">Airtel</option>
+                        <option value="orange">Orange</option>
+                      </select>
+                    </div>
+                  </>
+                )}
 
-              <div>
-                <label className="label">Reference</label>
-                <input
-                  type="text"
-                  value={paymentForm.payment_reference || ''}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, payment_reference: e.target.value })}
-                  className="input"
-                  placeholder="Transaction reference"
-                />
-              </div>
+                <div>
+                  <label className="label">Payment Date *</label>
+                  <input
+                    type="date"
+                    value={paymentForm.payment_date as string}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, payment_date: e.target.value })}
+                    className="input"
+                    required
+                  />
+                </div>
 
-              <div>
-                <label className="label">Notes</label>
-                <textarea
-                  value={paymentForm.notes || ''}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
-                  className="input"
-                  rows={2}
-                />
+                <div>
+                  <label className="label">Reference</label>
+                  <input
+                    type="text"
+                    value={paymentForm.payment_reference || ''}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, payment_reference: e.target.value })}
+                    className="input"
+                    placeholder="Transaction reference"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="label">Notes</label>
+                  <textarea
+                    value={paymentForm.notes || ''}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                    className="input"
+                    rows={2}
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
-                <button type="button" aria-label="Cancel payment" onClick={() => setIsPaymentModalOpen(false)} className="btn-outline">
+                <button
+                  type="button"
+                  aria-label="Cancel payment"
+                  onClick={() => setIsPaymentModalOpen(false)}
+                  className="btn-outline"
+                >
                   Cancel
                 </button>
-                <button type="submit" aria-label="Submit payment" disabled={createPaymentMutation.isLoading || lanariMutation.isLoading} className="btn-primary">
+                <button
+                  type="submit"
+                  aria-label="Submit payment"
+                  disabled={createPaymentMutation.isLoading || lanariMutation.isLoading}
+                  className="btn-primary"
+                >
                   {createPaymentMutation.isLoading || lanariMutation.isLoading ? 'Processing...' : 'Pay Now'}
                 </button>
               </div>

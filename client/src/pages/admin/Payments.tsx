@@ -332,148 +332,156 @@ const Payments = () => {
 
       {/* ─────────── MODAL ─────────── */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-2xl font-bold mb-4">Record Payment</h2>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-gray-900">Record Payment</h2>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700 text-sm"
+              >
+                Close
+              </button>
+            </div>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="label">Seller *</label>
-                <select
-                  value={formData.seller_id || 0}
-                  onChange={(e) => setFormData({ ...formData, seller_id: parseInt(e.target.value) })}
-                  className="input"
-                  required
-                >
-                  <option value={0}>Select Seller</option>
-                  {sellers.map((s: any) => (
-                    <option key={s.seller_id} value={s.seller_id}>
-                      {s.full_name || s.business_name || `Seller ${s.seller_id}`}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="label">Allocation *</label>
-                <select
-                  value={formData.allocation_id || 0}
-                  onChange={(e) =>
-                    setFormData({ ...formData, allocation_id: parseInt(e.target.value) })
-                  }
-                  className="input"
-                  required
-                >
-                  <option value={0}>Select Allocation</option>
-                  {managedAllocations
-                    .filter((a: any) => a.seller_id === formData.seller_id || !formData.seller_id)
-                    .map((a: any) => (
-                      <option key={a.allocation_id} value={a.allocation_id}>
-                        Allocation #{a.allocation_id} - Space {a.space_id}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Seller *</label>
+                  <select
+                    value={formData.seller_id || 0}
+                    onChange={(e) => setFormData({ ...formData, seller_id: parseInt(e.target.value) })}
+                    className="input"
+                    required
+                  >
+                    <option value={0}>Select Seller</option>
+                    {sellers.map((s: any) => (
+                      <option key={s.seller_id} value={s.seller_id}>
+                        {s.full_name || s.business_name || `Seller ${s.seller_id}`}
                       </option>
                     ))}
-                </select>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="label">Allocation *</label>
+                  <select
+                    value={formData.allocation_id || 0}
+                    onChange={(e) =>
+                      setFormData({ ...formData, allocation_id: parseInt(e.target.value) })
+                    }
+                    className="input"
+                    required
+                  >
+                    <option value={0}>Select Allocation</option>
+                    {managedAllocations
+                      .filter((a: any) => a.seller_id === formData.seller_id || !formData.seller_id)
+                      .map((a: any) => (
+                        <option key={a.allocation_id} value={a.allocation_id}>
+                          Allocation #{a.allocation_id} - Space {a.space_id}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="label">Amount ($) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.amount || ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, amount: parseFloat(e.target.value) })
+                    }
+                    className="input"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="label">Payment Method *</label>
+                  <select
+                    value={formData.payment_method}
+                    onChange={(e) =>
+                      setFormData({ ...formData, payment_method: e.target.value as any })
+                    }
+                    className="input"
+                    required
+                  >
+                    <option value="mobile_money">Mobile Money</option>
+                  </select>
+                </div>
+
+                {formData.payment_method === 'mobile_money' && (
+                  <>
+                    <div>
+                      <label className="label">Mobile Money Number *</label>
+                      <input
+                        type="tel"
+                        value={formData.mobile_money_number || ''}
+                        onChange={(e) =>
+                          setFormData({ ...formData, mobile_money_number: e.target.value })
+                        }
+                        className="input"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Provider</label>
+                      <select
+                        value={formData.mobile_money_provider || ''}
+                        onChange={(e) =>
+                          setFormData({ ...formData, mobile_money_provider: e.target.value })
+                        }
+                        className="input"
+                      >
+                        <option value="">Select Provider</option>
+                        <option value="mtn">MTN</option>
+                        <option value="airtel">Airtel</option>
+                        <option value="orange">Orange</option>
+                      </select>
+                    </div>
+                  </>
+                )}
+
+                <div>
+                  <label className="label">Payment Date *</label>
+                  <input
+                    type="date"
+                    value={formData.payment_date}
+                    onChange={(e) =>
+                      setFormData({ ...formData, payment_date: e.target.value })
+                    }
+                    className="input"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="label">Reference</label>
+                  <input
+                    type="text"
+                    value={formData.payment_reference || ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, payment_reference: e.target.value })
+                    }
+                    className="input"
+                    placeholder="Transaction reference"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="label">Notes</label>
+                  <textarea
+                    value={formData.notes || ''}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    className="input"
+                    rows={2}
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="label">Amount ($) *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.amount || ''}
-                  onChange={(e) =>
-                    setFormData({ ...formData, amount: parseFloat(e.target.value) })
-                  }
-                  className="input"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="label">Payment Method *</label>
-                <select
-                  value={formData.payment_method}
-                  onChange={(e) =>
-                    setFormData({ ...formData, payment_method: e.target.value as any })
-                  }
-                  className="input"
-                  required
-                >
-                  <option value="mobile_money">Mobile Money</option>
-                  <option value="bank_transfer">Bank Transfer</option>
-                  <option value="cash">Cash</option>
-                  <option value="card">Card</option>
-                </select>
-              </div>
-
-              {formData.payment_method === 'mobile_money' && (
-                <>
-                  <div>
-                    <label className="label">Mobile Money Number *</label>
-                    <input
-                      type="tel"
-                      value={formData.mobile_money_number || ''}
-                      onChange={(e) =>
-                        setFormData({ ...formData, mobile_money_number: e.target.value })
-                      }
-                      className="input"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="label">Provider</label>
-                    <select
-                      value={formData.mobile_money_provider || ''}
-                      onChange={(e) =>
-                        setFormData({ ...formData, mobile_money_provider: e.target.value })
-                      }
-                      className="input"
-                    >
-                      <option value="">Select Provider</option>
-                      <option value="mtn">MTN</option>
-                      <option value="airtel">Airtel</option>
-                      <option value="orange">Orange</option>
-                    </select>
-                  </div>
-                </>
-              )}
-
-              <div>
-                <label className="label">Payment Date *</label>
-                <input
-                  type="date"
-                  value={formData.payment_date}
-                  onChange={(e) =>
-                    setFormData({ ...formData, payment_date: e.target.value })
-                  }
-                  className="input"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="label">Reference</label>
-                <input
-                  type="text"
-                  value={formData.payment_reference || ''}
-                  onChange={(e) =>
-                    setFormData({ ...formData, payment_reference: e.target.value })
-                  }
-                  className="input"
-                  placeholder="Transaction reference"
-                />
-              </div>
-
-              <div>
-                <label className="label">Notes</label>
-                <textarea
-                  value={formData.notes || ''}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="input"
-                  rows={2}
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-2">
+              <div className="flex justify-end gap-3 pt-4">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}

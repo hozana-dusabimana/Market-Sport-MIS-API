@@ -1,90 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
-// Assuming userService and User interface exist in this scope for demonstration
-// import { userService, User } from '../../services/userService' 
+import { userService, User } from '../../services/userService'
 import toast from 'react-hot-toast'
-import { Search, UserCheck, UserX, Eye, Users, Shield, UserCog, X } from 'lucide-react'
+import { Search, UserCheck, UserX, Eye, Users, Shield, UserCog, X, Pencil, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { format } from 'date-fns'
 
 // Mock types and service calls for independent execution
 // NOTE: In a real environment, you would use the actual imports.
-interface User {
-  user_id: number;
-  username: string;
-  email: string;
-  phone_number: string | null;
-  user_type: 'admin' | 'manager' | 'seller' | 'customer';
-  status: 'active' | 'suspended' | 'inactive';
-  last_login: string | null;
-  created_at: string;
-}
-
-const mockUserService = {
-    getAll: async ({ user_type, status, search }: any) => {
-        // Mock data fetching logic with delay for demonstration
-        await new Promise(resolve => setTimeout(resolve, 300));
-        console.log(`Fetching users: Type=${user_type}, Status=${status}, Search=${search}`);
-
-        const mockUsers: User[] = [
-            { user_id: 1, username: 'admin_user', email: 'admin@example.com', phone_number: '123-456-7890', user_type: 'admin', status: 'active', last_login: new Date(Date.now() - 3600000).toISOString(), created_at: new Date(Date.now() - 86400000 * 30).toISOString() },
-            { user_id: 2, username: 'manager_smith', email: 'manager@example.com', phone_number: null, user_type: 'manager', status: 'active', last_login: new Date(Date.now() - 10000).toISOString(), created_at: new Date(Date.now() - 86400000 * 50).toISOString() },
-            { user_id: 3, username: 'seller_jones', email: 'seller@example.com', phone_number: '987-654-3210', user_type: 'seller', status: 'suspended', last_login: new Date(Date.now() - 86400000 * 5).toISOString(), created_at: new Date(Date.now() - 86400000 * 100).toISOString() },
-            { user_id: 4, username: 'inactive_user', email: 'inactive@example.com', phone_number: null, user_type: 'customer', status: 'inactive', last_login: null, created_at: new Date(Date.now() - 86400000 * 20).toISOString() },
-            { user_id: 5, username: 'test_active', email: 'active@example.com', phone_number: '111-222-3333', user_type: 'seller', status: 'active', last_login: new Date().toISOString(), created_at: new Date(Date.now() - 86400000 * 15).toISOString() },
-            // Add many more mock users to test scrolling behavior
-            ...Array.from({ length: 20 }).map((_, i) => ({
-                user_id: i + 6,
-                username: `user_${i + 6}`,
-                email: `user${i+6}@example.com`,
-                phone_number: null,
-                user_type: i % 3 === 0 ? 'seller' : 'customer',
-                status: i % 5 === 0 ? 'suspended' : 'active',
-                last_login: new Date(Date.now() - i * 100000).toISOString(),
-                created_at: new Date(Date.now() - i * 86400000).toISOString(),
-            })),
-        ];
-
-        let filtered = mockUsers;
-
-        if (user_type) {
-            filtered = filtered.filter(u => u.user_type === user_type);
-        }
-        if (status) {
-            filtered = filtered.filter(u => u.status === status);
-        }
-        if (search) {
-            const lowerSearch = search.toLowerCase();
-            filtered = filtered.filter(u => 
-                u.username.toLowerCase().includes(lowerSearch) ||
-                u.email.toLowerCase().includes(lowerSearch) ||
-                (u.phone_number && u.phone_number.includes(lowerSearch))
-            );
-        }
-
-        return { data: filtered };
-    },
-    getStatistics: async () => ({
-        data: [
-            { user_type: 'admin', total: 1, active: 1, suspended: 0 },
-            { user_type: 'manager', total: 1, active: 1, suspended: 0 },
-            { user_type: 'seller', total: 8, active: 6, suspended: 2 },
-            { user_type: 'customer', total: 15, active: 12, suspended: 3 },
-        ]
-    }),
-    getById: async (id: number) => {
-        const user = (await mockUserService.getAll({})).data.find((u: User) => u.user_id === id);
-        return { success: !!user, data: user };
-    },
-    updateStatus: async (id: number, status: string) => {
-        // Mock success
-        return { success: true };
-    }
-}
-const userService = mockUserService; 
-// End Mock Services
 
 // --- Utility Components ---
-
 const StatCard = ({ title, value, active, suspended, icon: Icon, colorClass = 'text-blue-600', bgColor = 'bg-blue-50' }: any) => (
   <div className="bg-white p-5 rounded-xl shadow-md border border-gray-100 transform hover:scale-[1.02] transition-transform duration-300">
     <div className="flex items-center justify-between">
@@ -109,11 +33,19 @@ const StatCard = ({ title, value, active, suspended, icon: Icon, colorClass = 't
 
 const UsersPage = () => {
   const [searchTerm, setSearchTerm] = useState('')
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('') // 👈 Debounced State
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('') // 
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [showDetails, setShowDetails] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [editForm, setEditForm] = useState({
+    username: '',
+    email: '',
+    phone_number: '',
+  })
 
   const queryClient = useQueryClient()
 
@@ -128,7 +60,46 @@ const UsersPage = () => {
       clearTimeout(handler)
     }
   }, [searchTerm])
-  // ----------------------------------------------------------------------
+
+  const handleOpenEdit = (user: User) => {
+    setSelectedUser(user)
+    setEditForm({
+      username: user.username,
+      email: user.email,
+      phone_number: user.phone_number || '',
+    })
+    setShowEdit(true)
+  }
+
+  const handleEditChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const { name, value } = e.target
+    setEditForm(prev => ({ ...prev, [name]: value }))
+  }
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedUser) return
+    if (!editForm.username.trim() || !editForm.email.trim()) {
+      toast.error('Username and email are required')
+      return
+    }
+    updateUserMutation.mutate({
+      id: selectedUser.user_id,
+      data: {
+        username: editForm.username.trim(),
+        email: editForm.email.trim(),
+        phone_number: editForm.phone_number || null,
+      },
+    })
+  }
+
+  const handleDeleteUser = (user: User) => {
+    if (confirm(`Are you sure you want to delete ${user.username}? This action cannot be undone.`)) {
+      deleteUserMutation.mutate(user.user_id)
+    }
+  }
 
   // 2. Use the debounced term in useQuery
   const { data, isLoading } = useQuery(
@@ -137,11 +108,33 @@ const UsersPage = () => {
       userService.getAll({
         user_type: typeFilter !== 'all' ? typeFilter : undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
-        search: debouncedSearchTerm || undefined, // 👈 Use debouncedSearchTerm
+        search: debouncedSearchTerm || undefined, // 
       })
   )
 
-  const users = data?.data?.users || data?.data || []
+  // Normalize users data from backend into a flat array
+  const rawData: any = data
+  let users: User[] = []
+  if (Array.isArray(rawData)) {
+    users = rawData
+  } else if (Array.isArray(rawData?.users)) {
+    users = rawData.users
+  } else if (Array.isArray(rawData?.data)) {
+    users = rawData.data
+  } else if (Array.isArray(rawData?.data?.users)) {
+    users = rawData.data.users
+  }
+
+  // Reset to first page when filters or search change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [typeFilter, statusFilter, debouncedSearchTerm])
+
+  const totalUsers = users.length
+  const totalPages = Math.max(1, Math.ceil(totalUsers / pageSize))
+  const startIndex = (currentPage - 1) * pageSize
+  const endIndex = startIndex + pageSize
+  const paginatedUsers = users.slice(startIndex, endIndex)
 
   const { data: statistics } = useQuery('user-statistics', () => userService.getStatistics())
 
@@ -155,6 +148,34 @@ const UsersPage = () => {
       },
       onError: (error: any) => {
         toast.error(error.response?.data?.message || 'Failed to update user status')
+      },
+    }
+  )
+
+  const updateUserMutation = useMutation(
+    ({ id, data }: { id: number; data: Partial<User> }) => userService.update(id, data),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('users')
+        toast.success('User updated successfully')
+        setShowEdit(false)
+        setSelectedUser(null)
+      },
+      onError: (error: any) => {
+        toast.error(error.response?.data?.message || 'Failed to update user')
+      },
+    }
+  )
+
+  const deleteUserMutation = useMutation(
+    (id: number) => userService.delete(id),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('users')
+        toast.success('User deleted successfully')
+      },
+      onError: (error: any) => {
+        toast.error(error.response?.data?.message || 'Failed to delete user')
       },
     }
   )
@@ -174,8 +195,9 @@ const UsersPage = () => {
     
     try {
       const response = await userService.getById(user.user_id!)
-      if (response.success) {
-        setSelectedUser(response.data)
+      const userData = (response as any)?.data || response
+      if (userData) {
+        setSelectedUser(userData)
         // Set state to true to trigger the modal open (and animation)
         setShowDetails(true)
       }
@@ -207,11 +229,17 @@ const UsersPage = () => {
     return <div className="text-center py-12 text-blue-600 font-medium">Loading users...</div>
   }
 
-  const statData = statistics?.data || [];
+  const statsRaw: any = statistics
+  const statData = Array.isArray(statsRaw)
+    ? statsRaw
+    : Array.isArray(statsRaw?.data)
+    ? statsRaw.data
+    : [];
+
   const adminStat = statData.find((s: any) => s.user_type === 'admin')
   const managerStat = statData.find((s: any) => s.user_type === 'manager')
   const sellerStat = statData.find((s: any) => s.user_type === 'seller')
-  const customerStat = statData.find((s: any) => s.user_type === 'customer')
+ 
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
@@ -220,11 +248,11 @@ const UsersPage = () => {
       </div>
 
       {/* Statistics Section */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
         <StatCard title="Admins" value={adminStat?.total} active={adminStat?.active} suspended={adminStat?.suspended} icon={Shield} colorClass='text-purple-600' bgColor='bg-purple-100' />
         <StatCard title="Managers" value={managerStat?.total} active={managerStat?.active} suspended={managerStat?.suspended} icon={UserCog} colorClass='text-blue-600' bgColor='bg-blue-100' />
         <StatCard title="Sellers" value={sellerStat?.total} active={sellerStat?.active} suspended={sellerStat?.suspended} icon={Users} colorClass='text-teal-600' bgColor='bg-teal-100' />
-        <StatCard title="Customers" value={customerStat?.total} active={customerStat?.active} suspended={customerStat?.suspended} icon={Users} colorClass='text-yellow-600' bgColor='bg-yellow-100' />
+       
       </div>
 
       {/* Filters and Search Bar */}
@@ -283,7 +311,7 @@ const UsersPage = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {users?.map((user: User) => (
+                {paginatedUsers?.map((user: User) => (
                   <tr key={user.user_id} className="hover:bg-blue-50/50 transition-colors duration-200">
                     <td className="py-3 px-4 font-medium text-sm text-gray-900">{user.username}</td>
                     <td className="py-3 px-4 text-sm text-gray-600">{user.email}</td>
@@ -311,15 +339,22 @@ const UsersPage = () => {
                       <div className="flex space-x-2">
                         <button
                           onClick={() => handleViewDetails(user)}
-                          className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-100 transition-all"
+                          className="text-blue-600 hover:text-blue-800 p-1.5 rounded-full hover:bg-blue-100 transition-all border border-transparent hover:border-blue-200"
                           title="View Details"
                         >
                           <Eye size={18} />
                         </button>
+                        <button
+                          onClick={() => handleOpenEdit(user)}
+                          className="text-amber-600 hover:text-amber-800 p-1.5 rounded-full hover:bg-amber-100 transition-all border border-transparent hover:border-amber-200"
+                          title="Edit User"
+                        >
+                          <Pencil size={18} />
+                        </button>
                         {user.status === 'active' ? (
                           <button
                             onClick={() => handleStatusChange(user, 'suspended')}
-                            className="text-red-600 hover:text-red-800 p-1 rounded-full hover:bg-red-100 transition-all"
+                            className="text-red-600 hover:text-red-800 p-1.5 rounded-full hover:bg-red-100 transition-all border border-transparent hover:border-red-200"
                             title="Suspend User"
                           >
                             <UserX size={18} />
@@ -327,12 +362,19 @@ const UsersPage = () => {
                         ) : (
                           <button
                             onClick={() => handleStatusChange(user, 'active')}
-                            className="text-green-600 hover:text-green-800 p-1 rounded-full hover:bg-green-100 transition-all"
+                            className="text-green-600 hover:text-green-800 p-1.5 rounded-full hover:bg-green-100 transition-all border border-transparent hover:border-green-200"
                             title="Activate User"
                           >
                             <UserCheck size={18} />
                           </button>
                         )}
+                        <button
+                          onClick={() => handleDeleteUser(user)}
+                          className="text-gray-500 hover:text-red-700 p-1.5 rounded-full hover:bg-red-50 transition-all border border-transparent hover:border-red-200"
+                          title="Delete User"
+                        >
+                          <Trash2 size={18} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -342,6 +384,73 @@ const UsersPage = () => {
           </div>
           {!users?.length && (
             <div className="text-center py-8 text-gray-500">No users found</div>
+          )}
+          {users?.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between mt-4 gap-3 border-t pt-4">
+              <div className="text-sm text-gray-600">
+                Showing <span className="font-semibold">{totalUsers === 0 ? 0 : startIndex + 1}</span> to{' '}
+                <span className="font-semibold">{Math.min(endIndex, totalUsers)}</span> of{' '}
+                <span className="font-semibold">{totalUsers}</span> users
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className={`flex items-center px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                    currentPage === 1
+                      ? 'text-gray-300 border-gray-200 cursor-not-allowed'
+                      : 'text-gray-700 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <ChevronLeft className="w-4 h-4 mr-1" />
+                  Prev
+                </button>
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: totalPages }).map((_, idx) => {
+                    const page = idx + 1
+                    const isActive = page === currentPage
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors border ${
+                          isActive
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  })}
+                </div>
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className={`flex items-center px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                    currentPage === totalPages
+                      ? 'text-gray-300 border-gray-200 cursor-not-allowed'
+                      : 'text-gray-700 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </button>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value) || 10)
+                    setCurrentPage(1)
+                  }}
+                  className="ml-2 px-2 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value={5}>5 / page</option>
+                  <option value={10}>10 / page</option>
+                  <option value={20}>20 / page</option>
+                  <option value={50}>50 / page</option>
+                </select>
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -410,6 +519,78 @@ const UsersPage = () => {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Edit Modal */}
+      {showEdit && selectedUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 transition-opacity duration-300">
+          <div className="bg-white rounded-xl shadow-2xl p-8 w-full max-w-xl max-h-[90vh] overflow-y-auto transform transition-all duration-300 ease-out scale-100 opacity-100">
+            <div className="flex justify-between items-center border-b pb-3 mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">Edit User</h2>
+              <button
+                onClick={() => {
+                  setShowEdit(false)
+                  setSelectedUser(null)
+                }}
+                className="text-gray-500 hover:text-gray-700 p-1 transition-colors rounded-full hover:bg-gray-100"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            <form onSubmit={handleEditSubmit} className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                <input
+                  type="text"
+                  name="username"
+                  value={editForm.username}
+                  onChange={handleEditChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter username"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  name="email"
+                  value={editForm.email}
+                  onChange={handleEditChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter email"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                <input
+                  type="text"
+                  name="phone_number"
+                  value={editForm.phone_number}
+                  onChange={handleEditChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter phone number"
+                />
+              </div>
+              <div className="flex justify-end space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEdit(false)
+                    setSelectedUser(null)
+                  }}
+                  className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm font-semibold shadow-sm flex items-center"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

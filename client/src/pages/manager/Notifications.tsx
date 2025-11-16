@@ -6,8 +6,9 @@ import { spaceService } from '../../services/spaceService'
 import { sellerService } from '../../services/sellerService'
 import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
-import { Plus, Bell, Check, X, Trash2 } from 'lucide-react'
+import { Plus, Bell, Check, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
+import { useNavigate } from 'react-router-dom'
 
 const ManagerNotifications = () => {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -23,6 +24,7 @@ const ManagerNotifications = () => {
   
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
+  const navigate = useNavigate()
   const managedZoneIds = user?.profile?.assigned_zones || []
   const managerId = (user as any)?.profile?.manager_id || (user as any)?.manager_id || null
   
@@ -95,6 +97,7 @@ const ManagerNotifications = () => {
     {
       onSuccess: () => {
         queryClient.invalidateQueries('notifications')
+        queryClient.invalidateQueries('manager-notifications')
         toast.success('Notification marked as read')
       },
     }
@@ -103,12 +106,13 @@ const ManagerNotifications = () => {
   const markAllAsReadMutation = useMutation(() => notificationService.markAllAsRead(), {
     onSuccess: () => {
       queryClient.invalidateQueries('notifications')
+      queryClient.invalidateQueries('manager-notifications')
       toast.success('All notifications marked as read')
     },
   })
 
   const updateStatusMutation = useMutation(
-    ({ id, status }: { id: number; status: string }) => notificationService.updateStatus(id, status),
+    ({ id, status }: { id: number; status: 'unread' | 'read' }) => notificationService.updateStatus(id, status),
     {
       onSuccess: () => {
         queryClient.invalidateQueries('notifications')
@@ -156,261 +160,282 @@ const ManagerNotifications = () => {
     return <div className="text-center py-12">Loading notifications...</div>
   }
 
+  const unreadCount = notifications.filter((n: any) => n.status === 'unread' || !n.is_read).length
+
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Notifications</h1>
-        <div className="flex space-x-2">
-          <button
-            onClick={() => markAllAsReadMutation.mutate()}
-            className="btn btn-secondary flex items-center space-x-2"
-          >
-            <Check size={18} />
-            <span>Mark All Read</span>
-          </button>
-          <button
-            onClick={() => {
-              resetForm()
-              setIsModalOpen(true)
-            }}
-            className="btn btn-primary flex items-center space-x-2"
-          >
-            <Plus size={20} />
-            <span>Send Notification</span>
-          </button>
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-40">
+      <div className="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="btn-secondary px-3 py-1 text-sm"
+            >
+              Back to Dashboard
+            </button>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Notifications</h1>
+              <p className="text-gray-600 mt-1">
+                Unread: <span className="font-bold text-blue-900">{unreadCount}</span>
+              </p>
+            </div>
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => markAllAsReadMutation.mutate()}
+              className="btn btn-secondary flex items-center space-x-2"
+            >
+              <Check size={18} />
+              <span>Mark All Read</span>
+            </button>
+            <button
+              onClick={() => {
+                resetForm()
+                setIsModalOpen(true)
+              }}
+              className="btn btn-primary flex items-center space-x-2"
+            >
+              <Plus size={20} />
+              <span>Send Notification</span>
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Filters */}
-      <div className="card mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="input"
-          >
-            <option value="all">All Status</option>
-            <option value="unread">Unread</option>
-            <option value="read">Read</option>
-          </select>
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="input"
-          >
-            <option value="all">All Types</option>
-            <option value="system">System</option>
-            <option value="payment">Payment</option>
-            <option value="allocation">Allocation</option>
-            <option value="verification">Verification</option>
-          </select>
+        {/* Filters */}
+        <div className="card mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="input"
+            >
+              <option value="all">All Status</option>
+              <option value="unread">Unread</option>
+              <option value="read">Read</option>
+            </select>
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="input"
+            >
+              <option value="all">All Types</option>
+              <option value="system">System</option>
+              <option value="payment">Payment</option>
+              <option value="allocation">Allocation</option>
+              <option value="verification">Verification</option>
+            </select>
+          </div>
         </div>
-      </div>
 
-      {/* Notifications List */}
-      <div className="card">
-        <div className="space-y-4">
-          {notifications.length > 0 ? (
-            notifications.map((notification: Notification) => {
-              const isUnread = notification.status === 'unread' || !notification.is_read
-              return (
-                <div
-                  key={notification.notification_id}
-                  className={`border rounded-lg p-4 ${
-                    isUnread ? 'bg-blue-50 border-blue-200' : 'bg-white border-neutral-200'
-                  }`}
-                  onClick={() => {
-                    if (isUnread && notification.notification_id) {
-                      markAsReadMutation.mutate(notification.notification_id)
-                    }
-                  }}
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <Bell className={`w-5 h-5 ${isUnread ? 'text-blue-600' : 'text-neutral-400'}`} />
-                        <h3 className={`font-semibold ${isUnread ? 'text-neutral-900' : 'text-neutral-700'}`}>
-                          {notification.title}
-                        </h3>
-                        <span
-                          className={`px-2 py-1 rounded text-xs font-medium ${
-                            notification.notification_type === 'payment'
-                              ? 'bg-green-100 text-green-800'
-                              : notification.notification_type === 'allocation'
+        {/* Notifications List */}
+        <div className="card">
+          <div className="space-y-4">
+            {notifications.length > 0 ? (
+              notifications.map((notification: Notification) => {
+                const isUnread = notification.status === 'unread' || !notification.is_read
+                return (
+                  <div
+                    key={notification.notification_id}
+                    className={`border rounded-lg p-4 cursor-pointer transition hover:shadow-md ${
+                      isUnread ? 'bg-blue-50 border-blue-200' : 'bg-white border-neutral-200'
+                    }`}
+                    onClick={() => {
+                      if (isUnread && notification.notification_id) {
+                        markAsReadMutation.mutate(notification.notification_id)
+                      }
+                    }}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-start gap-3 mb-2">
+                          <span
+                            className={`mt-1 inline-block h-2.5 w-2.5 rounded-full ${
+                              isUnread ? 'bg-blue-500' : 'bg-gray-300'
+                            }`}
+                          />
+                          <div className="flex items-center space-x-2">
+                            <Bell className={`w-5 h-5 ${isUnread ? 'text-blue-600' : 'text-neutral-400'}`} />
+                            <h3 className={`font-semibold ${isUnread ? 'text-neutral-900' : 'text-neutral-700'}`}>
+                              {notification.title}
+                            </h3>
+                            <span
+                              className={`px-2 py-1 rounded text-xs font-medium ${
+                                notification.notification_type === 'payment'
+                                  ? 'bg-green-100 text-green-800'
+                                  : notification.notification_type === 'allocation'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : notification.notification_type === 'verification'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}
+                            >
+                              {notification.notification_type}
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-neutral-700 text-sm mb-2">{notification.message}</p>
+                        <div className="flex items-center space-x-4 text-xs text-neutral-500">
+                          {notification.user_id && <span>User ID: {notification.user_id}</span>}
+                          {notification.seller_id && <span>Seller ID: {notification.seller_id}</span>}
+                          {notification.created_at && (
+                            <span>
+                              {format(new Date(notification.created_at), 'MMM dd, yyyy HH:mm')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {isUnread && (
+                          <button
+                            onClick={() => markAsReadMutation.mutate(notification.notification_id!)}
+                            className="text-blue-600 hover:text-blue-700"
+                            title="Mark as Read"
+                          >
+                            <Check size={18} />
+                          </button>
+                        )}
+                        <select
+                          value={notification.status}
+                          onChange={(e) => {
+                            updateStatusMutation.mutate({
+                              id: notification.notification_id!,
+                              status: e.target.value as 'unread' | 'read',
+                            })
+                          }}
+                          className={`px-2 py-1 rounded text-xs font-medium border-0 ${
+                            notification.status === 'unread'
                               ? 'bg-blue-100 text-blue-800'
-                              : notification.notification_type === 'verification'
-                              ? 'bg-yellow-100 text-yellow-800'
                               : 'bg-gray-100 text-gray-800'
                           }`}
                         >
-                          {notification.notification_type}
-                        </span>
-                      </div>
-                      <p className="text-neutral-700 text-sm mb-2">{notification.message}</p>
-                      <div className="flex items-center space-x-4 text-xs text-neutral-500">
-                        {notification.user_id && (
-                          <span>User ID: {notification.user_id}</span>
-                        )}
-                        {notification.seller_id && (
-                          <span>Seller ID: {notification.seller_id}</span>
-                        )}
-                        {notification.created_at && (
-                          <span>
-                            {format(new Date(notification.created_at), 'MMM dd, yyyy HH:mm')}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      {isUnread && (
+                          <option value="unread">Unread</option>
+                          <option value="read">Read</option>
+                        </select>
                         <button
-                          onClick={() => markAsReadMutation.mutate(notification.notification_id!)}
-                          className="text-blue-600 hover:text-blue-700"
-                          title="Mark as Read"
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to delete this notification?')) {
+                              deleteMutation.mutate(notification.notification_id!)
+                            }
+                          }}
+                          className="text-red-600 hover:text-red-700"
+                          title="Delete"
                         >
-                          <Check size={18} />
+                          <Trash2 size={18} />
                         </button>
-                      )}
-                      <select
-                        value={notification.status}
-                        onChange={(e) => {
-                          updateStatusMutation.mutate({
-                            id: notification.notification_id!,
-                            status: e.target.value,
-                          })
-                        }}
-                        className={`px-2 py-1 rounded text-xs font-medium border-0 ${
-                          notification.status === 'unread'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        <option value="unread">Unread</option>
-                        <option value="read">Read</option>
-                      </select>
-                      <button
-                        onClick={() => {
-                          if (window.confirm('Are you sure you want to delete this notification?')) {
-                            deleteMutation.mutate(notification.notification_id!)
-                          }
-                        }}
-                        className="text-red-600 hover:text-red-700"
-                        title="Delete"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )
-            })
-          ) : (
-            <div className="text-center py-12 text-neutral-500 fade-in">
-              <Bell className="w-12 h-12 text-neutral-400 mx-auto mb-4" />
-              <p>No notifications found</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Create Notification Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 fade-in">
-          <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto slide-up">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Send Notification</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="label">Seller (scoped to your market)</label>
-                <select
-                  value={formData.seller_id || 0}
-                  onChange={(e) => setFormData({ ...formData, seller_id: e.target.value ? parseInt(e.target.value) : undefined })}
-                  className="input"
-                >
-                  <option value={0}>Select Seller (optional)</option>
-                  {sellers
-                    .filter((s: any) => managedZoneIds.length === 0 || managedSellerIds.includes(s.seller_id || s.user_id) || (managerId && s.manager_id === managerId))
-                    .map((s: any) => (
-                      <option key={s.seller_id || s.user_id} value={s.seller_id || s.user_id}>
-                        {s.business_name || s.full_name || s.user?.username || 'Seller'}
-                      </option>
-                    ))}
-                </select>
-                <p className="text-xs text-gray-500 mt-1">You can also fill User ID or Seller ID directly below if needed.</p>
+                )
+              })
+            ) : (
+              <div className="text-center py-12 text-neutral-500 fade-in">
+                <Bell className="w-12 h-12 text-neutral-400 mx-auto mb-4" />
+                <p>No notifications found</p>
               </div>
-              <div>
-                <label className="label">User ID (optional)</label>
-                <input
-                  type="number"
-                  value={formData.user_id || ''}
-                  onChange={(e) => setFormData({ ...formData, user_id: e.target.value ? parseInt(e.target.value) : undefined })}
-                  className="input"
-                  placeholder="Leave empty for all users"
-                />
-              </div>
-              <div>
-                <label className="label">Seller ID (optional)</label>
-                <input
-                  type="number"
-                  value={formData.seller_id || ''}
-                  onChange={(e) => setFormData({ ...formData, seller_id: e.target.value ? parseInt(e.target.value) : undefined })}
-                  className="input"
-                  placeholder="Leave empty if not seller-specific"
-                />
-              </div>
-              <div>
-                <label className="label">Title *</label>
-                <input
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="input"
-                  required
-                />
-              </div>
-              <div>
-                <label className="label">Message *</label>
-                <textarea
-                  value={formData.message}
-                  onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                  className="input"
-                  rows={4}
-                  required
-                />
-              </div>
-              <div>
-                <label className="label">Notification Type *</label>
-                <select
-                  value={formData.notification_type || 'system'}
-                  onChange={(e) => setFormData({ ...formData, notification_type: e.target.value as any })}
-                  className="input"
-                  required
-                >
-                  <option value="system">System</option>
-                  <option value="payment">Payment</option>
-                  <option value="allocation">Allocation</option>
-                  <option value="verification">Verification</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              <div className="flex space-x-3 pt-4">
-                <button type="submit" className="btn btn-primary flex-1">
-                  Send
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsModalOpen(false)
-                    resetForm()
-                  }}
-                  className="btn btn-secondary flex-1"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+            )}
           </div>
         </div>
-      )}
+
+        {/* Create Notification Modal */}
+        {isModalOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 fade-in">
+            <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto slide-up">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">Send Notification</h2>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="label">Seller (scoped to your market)</label>
+                  <select
+                    value={formData.seller_id || 0}
+                    onChange={(e) => setFormData({ ...formData, seller_id: e.target.value ? parseInt(e.target.value) : undefined })}
+                    className="input"
+                  >
+                    <option value={0}>Select Seller (optional)</option>
+                    {sellers
+                      .filter((s: any) => managedZoneIds.length === 0 || managedSellerIds.includes(s.seller_id || s.user_id) || (managerId && s.manager_id === managerId))
+                      .map((s: any) => (
+                        <option key={s.seller_id || s.user_id} value={s.seller_id || s.user_id}>
+                          {s.business_name || s.full_name || s.user?.username || 'Seller'}
+                        </option>
+                      ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">You can also fill User ID or Seller ID directly below if needed.</p>
+                </div>
+                <div>
+                  <label className="label">User ID (optional)</label>
+                  <input
+                    type="number"
+                    value={formData.user_id || ''}
+                    onChange={(e) => setFormData({ ...formData, user_id: e.target.value ? parseInt(e.target.value) : undefined })}
+                    className="input"
+                    placeholder="Leave empty for all users"
+                  />
+                </div>
+                <div>
+                  <label className="label">Seller ID (optional)</label>
+                  <input
+                    type="number"
+                    value={formData.seller_id || ''}
+                    onChange={(e) => setFormData({ ...formData, seller_id: e.target.value ? parseInt(e.target.value) : undefined })}
+                    className="input"
+                    placeholder="Leave empty if not seller-specific"
+                  />
+                </div>
+                <div>
+                  <label className="label">Title *</label>
+                  <input
+                    type="text"
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    className="input"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="label">Message *</label>
+                  <textarea
+                    value={formData.message}
+                    onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                    className="input"
+                    rows={4}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="label">Notification Type *</label>
+                  <select
+                    value={formData.notification_type || 'system'}
+                    onChange={(e) => setFormData({ ...formData, notification_type: e.target.value as any })}
+                    className="input"
+                    required
+                  >
+                    <option value="system">System</option>
+                    <option value="payment">Payment</option>
+                    <option value="allocation">Allocation</option>
+                    <option value="verification">Verification</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div className="flex space-x-3 pt-4">
+                  <button type="submit" className="btn btn-primary flex-1">
+                    Send
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsModalOpen(false)
+                      resetForm()
+                    }}
+                    className="btn btn-secondary flex-1"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

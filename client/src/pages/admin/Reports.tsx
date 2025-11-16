@@ -78,8 +78,37 @@ const Reports = () => {
   const { data: sellerCountsData } = useQuery('seller-status-count', () => sellerService.getCountByStatus(), { retry: false })
   const dateFrom = format(subDays(new Date(), 30), 'yyyy-MM-dd')
   const dateTo = format(new Date(), 'yyyy-MM-dd')
-  const { data: revenueByZoneData } = useQuery(['revenue-by-zone', dateFrom, dateTo], () => paymentService.getRevenueByZone({ date_from: dateFrom, date_to: dateTo }), { retry: false })
+  const { data: revenueByZoneData } = useQuery(
+    ['revenue-by-zone', dateFrom, dateTo],
+    () => paymentService.getRevenueByZone({ date_from: dateFrom, date_to: dateTo }),
+    { retry: false }
+  )
   const { data: allocationsData } = useQuery('allocations', () => allocationService.getAll(), { retry: false })
+
+  // New detailed reports using backend report controller
+  const { data: revenueReportData } = useQuery(
+    ['admin-revenue-report', dateFrom, dateTo],
+    () => reportService.getRevenueReport(dateFrom, dateTo),
+    { retry: false }
+  )
+
+  const { data: sellerReportData } = useQuery(
+    ['admin-seller-report', dateFrom, dateTo],
+    () => reportService.getSellerReport(dateFrom, dateTo, 10),
+    { retry: false }
+  )
+
+  const { data: zoneStatisticsData } = useQuery(
+    ['admin-zone-statistics', dateFrom, dateTo],
+    () => reportService.getZoneStatistics(dateFrom, dateTo),
+    { retry: false }
+  )
+
+  const { data: allocationSummaryData } = useQuery(
+    ['admin-allocation-summary', dateFrom, dateTo],
+    () => reportService.getAllocationSummary(dateFrom, dateTo),
+    { retry: false }
+  )
 
   const isLoading = dailyLoading || weeklyLoading || monthlyLoading
 
@@ -130,6 +159,23 @@ const Reports = () => {
     }
     return Object.entries(m).map(([status, count]) => ({ status, count }))
   })()
+
+  // Normalize new report payloads from backend
+  const revenueReportRaw: any = revenueReportData?.data || revenueReportData || {}
+  const revenueSummary = revenueReportRaw?.summary || {}
+  const revenueBreakdown: any[] = Array.isArray(revenueReportRaw?.breakdown) ? revenueReportRaw.breakdown : []
+
+  const sellerReportRaw: any = sellerReportData?.data || sellerReportData || {}
+  const topSellers: any[] = Array.isArray(sellerReportRaw?.sellers) ? sellerReportRaw.sellers : []
+  const sellerReportSummary = sellerReportRaw?.summary || {}
+
+  const zoneStatsRaw: any = zoneStatisticsData?.data || zoneStatisticsData || {}
+  const zoneStatsZones: any[] = Array.isArray(zoneStatsRaw?.zones) ? zoneStatsRaw.zones : []
+  const zoneStatsSummary = zoneStatsRaw?.summary || {}
+
+  const allocationSummaryRaw: any = allocationSummaryData?.data || allocationSummaryData || {}
+  const allocationSummaryZones: any[] = Array.isArray(allocationSummaryRaw?.zones) ? allocationSummaryRaw.zones : []
+  const allocationSummaryTotals = allocationSummaryRaw?.summary || {}
 
   return (
     <div className="container">
@@ -324,6 +370,214 @@ const Reports = () => {
               </div>
             </div>
           </div>
+
+          {/* Revenue summary from backend revenue report */}
+          {revenueBreakdown.length > 0 && (
+            <div className="card lg:col-span-2">
+              <h2 className="text-xl font-semibold mb-4">Revenue Report (Last 30 Days)</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Total Revenue</p>
+                  <p className="text-2xl font-bold text-gray-900">${safeNumber(revenueSummary.total_revenue).toFixed(2)}</p>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Total Transactions</p>
+                  <p className="text-2xl font-bold text-gray-900">{safeNumber(revenueSummary.total_transactions)}</p>
+                </div>
+                <div className="bg-purple-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Average Transaction</p>
+                  <p className="text-2xl font-bold text-gray-900">${safeNumber(revenueSummary.average_transaction).toFixed(2)}</p>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-gray-600 border-b">
+                      <th className="py-2 pr-4">Payment Method</th>
+                      <th className="py-2 pr-4">Status</th>
+                      <th className="py-2 pr-4 text-right">Transactions</th>
+                      <th className="py-2 pr-4 text-right">Total Amount</th>
+                      <th className="py-2 pr-4 text-right">Average</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {revenueBreakdown.map((row, idx) => (
+                      <tr key={idx} className="border-b last:border-0">
+                        <td className="py-2 pr-4 capitalize">{String(row.payment_method || 'Unknown').replace('_', ' ')}</td>
+                        <td className="py-2 pr-4 capitalize">{String(row.status || 'unknown')}</td>
+                        <td className="py-2 pr-4 text-right">{safeNumber(row.transaction_count)}</td>
+                        <td className="py-2 pr-4 text-right">${safeNumber(row.total_amount).toFixed(2)}</td>
+                        <td className="py-2 pr-4 text-right">${safeNumber(row.average_amount).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Top sellers report */}
+          {topSellers.length > 0 && (
+            <div className="card lg:col-span-2">
+              <h2 className="text-xl font-semibold mb-4">Top Sellers (Last 30 Days)</h2>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Total Sellers</p>
+                  <p className="text-2xl font-bold text-gray-900">{safeNumber(sellerReportSummary.total_sellers)}</p>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Total Revenue</p>
+                  <p className="text-2xl font-bold text-gray-900">${safeNumber(sellerReportSummary.total_revenue).toFixed(2)}</p>
+                </div>
+                <div className="bg-emerald-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Total Allocations</p>
+                  <p className="text-2xl font-bold text-gray-900">{safeNumber(sellerReportSummary.total_allocations)}</p>
+                </div>
+                <div className="bg-purple-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Avg Revenue / Seller</p>
+                  <p className="text-2xl font-bold text-gray-900">${safeNumber(sellerReportSummary.average_revenue_per_seller).toFixed(2)}</p>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-gray-600 border-b">
+                      <th className="py-2 pr-4">Seller</th>
+                      <th className="py-2 pr-4">Business</th>
+                      <th className="py-2 pr-4">Phone</th>
+                      <th className="py-2 pr-4">Email</th>
+                      <th className="py-2 pr-4 text-right">Allocations</th>
+                      <th className="py-2 pr-4 text-right">Payments</th>
+                      <th className="py-2 pr-4 text-right">Total Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topSellers.map((s) => (
+                      <tr key={s.seller_id} className="border-b last:border-0">
+                        <td className="py-2 pr-4">{s.full_name || 'N/A'}</td>
+                        <td className="py-2 pr-4">{s.business_name || 'N/A'}</td>
+                        <td className="py-2 pr-4">{s.phone_number || '-'}</td>
+                        <td className="py-2 pr-4">{s.email || '-'}</td>
+                        <td className="py-2 pr-4 text-right">{safeNumber(s.total_allocations)}</td>
+                        <td className="py-2 pr-4 text-right">{safeNumber(s.total_payments)}</td>
+                        <td className="py-2 pr-4 text-right">${safeNumber(s.total_revenue).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Zone statistics report */}
+          {zoneStatsZones.length > 0 && (
+            <div className="card lg:col-span-2">
+              <h2 className="text-xl font-semibold mb-4">Zone Statistics (Last 30 Days)</h2>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Zones</p>
+                  <p className="text-2xl font-bold text-gray-900">{safeNumber(zoneStatsSummary.total_zones)}</p>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Total Revenue</p>
+                  <p className="text-2xl font-bold text-gray-900">${safeNumber(zoneStatsSummary.total_revenue).toFixed(2)}</p>
+                </div>
+                <div className="bg-emerald-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Total Allocations</p>
+                  <p className="text-2xl font-bold text-gray-900">{safeNumber(zoneStatsSummary.total_allocations)}</p>
+                </div>
+                <div className="bg-purple-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Unique Sellers</p>
+                  <p className="text-2xl font-bold text-gray-900">{safeNumber(zoneStatsSummary.total_unique_sellers)}</p>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-gray-600 border-b">
+                      <th className="py-2 pr-4">Zone</th>
+                      <th className="py-2 pr-4 text-right">Total Spaces</th>
+                      <th className="py-2 pr-4 text-right">Available</th>
+                      <th className="py-2 pr-4 text-right">Occupied</th>
+                      <th className="py-2 pr-4 text-right">Allocations</th>
+                      <th className="py-2 pr-4 text-right">Unique Sellers</th>
+                      <th className="py-2 pr-4 text-right">Occupancy Rate</th>
+                      <th className="py-2 pr-4 text-right">Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {zoneStatsZones.map((z) => (
+                      <tr key={z.zone_id} className="border-b last:border-0">
+                        <td className="py-2 pr-4">{z.zone_name}</td>
+                        <td className="py-2 pr-4 text-right">{safeNumber(z.total_spaces)}</td>
+                        <td className="py-2 pr-4 text-right">{safeNumber(z.available_spaces)}</td>
+                        <td className="py-2 pr-4 text-right">{safeNumber(z.occupied_spaces)}</td>
+                        <td className="py-2 pr-4 text-right">{safeNumber(z.total_allocations)}</td>
+                        <td className="py-2 pr-4 text-right">{safeNumber(z.unique_sellers)}</td>
+                        <td className="py-2 pr-4 text-right">{safeNumber(z.occupancy_rate).toFixed(2)}%</td>
+                        <td className="py-2 pr-4 text-right">${safeNumber(z.total_revenue).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Allocation summary report */}
+          {allocationSummaryZones.length > 0 && (
+            <div className="card lg:col-span-2">
+              <h2 className="text-xl font-semibold mb-4">Allocation Summary (Last 30 Days)</h2>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Total Zones</p>
+                  <p className="text-2xl font-bold text-gray-900">{safeNumber(allocationSummaryTotals.total_zones)}</p>
+                </div>
+                <div className="bg-emerald-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Total Allocations</p>
+                  <p className="text-2xl font-bold text-gray-900">{safeNumber(allocationSummaryTotals.total_allocations)}</p>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Active</p>
+                  <p className="text-2xl font-bold text-gray-900">{safeNumber(allocationSummaryTotals.active_allocations)}</p>
+                </div>
+                <div className="bg-yellow-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Pending</p>
+                  <p className="text-2xl font-bold text-gray-900">{safeNumber(allocationSummaryTotals.pending_allocations)}</p>
+                </div>
+                <div className="bg-red-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Terminated</p>
+                  <p className="text-2xl font-bold text-gray-900">{safeNumber(allocationSummaryTotals.terminated_allocations)}</p>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-gray-600 border-b">
+                      <th className="py-2 pr-4">Zone</th>
+                      <th className="py-2 pr-4 text-right">Total Allocations</th>
+                      <th className="py-2 pr-4 text-right">Active</th>
+                      <th className="py-2 pr-4 text-right">Pending</th>
+                      <th className="py-2 pr-4 text-right">Terminated</th>
+                      <th className="py-2 pr-4 text-right">Unique Sellers</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allocationSummaryZones.map((z) => (
+                      <tr key={z.zone_id} className="border-b last:border-0">
+                        <td className="py-2 pr-4">{z.zone_name}</td>
+                        <td className="py-2 pr-4 text-right">{safeNumber(z.total_allocations)}</td>
+                        <td className="py-2 pr-4 text-right">{safeNumber(z.active_allocations)}</td>
+                        <td className="py-2 pr-4 text-right">{safeNumber(z.pending_allocations)}</td>
+                        <td className="py-2 pr-4 text-right">{safeNumber(z.terminated_allocations)}</td>
+                        <td className="py-2 pr-4 text-right">{safeNumber(z.unique_sellers)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {(dailyReport || weeklyReport || monthlyReport) && (
             <div className="card lg:col-span-2">
