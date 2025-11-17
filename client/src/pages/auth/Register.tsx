@@ -32,7 +32,7 @@ const Register = () => {
               <div className="w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center mr-3">
                 <Store className="w-6 h-6 text-white" />
               </div>
-              <span className="text-2xl font-bold text-teal-600">MARKET SPOTON</span>
+              <a href="/"><span className="text-2xl font-bold text-teal-600">MARKET SPOTON</span></a>
             </div>
 
             {/* Heading */}

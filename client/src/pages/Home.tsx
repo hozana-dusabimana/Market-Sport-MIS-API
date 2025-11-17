@@ -129,7 +129,7 @@ const Home = () => {
             </div>
             <div className="relative">
               <img
-                src="https://images.unsplash.com/photo-1521335629791-ce4aec03f73a?auto=format&fit=crop&w=1600&q=80"
+                src="https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1200&q=80"
                 alt="Modern market management"
                 className="w-full rounded-3xl shadow-2xl object-cover h-[420px] lg:h-[520px]"
                 loading="lazy"
