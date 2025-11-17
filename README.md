@@ -217,3 +217,13 @@ ISC
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
+## admin default credientials
+- email :admin@marketspoton.com
+- password: Password@123
+## manager default credientials 
+- email :manager1@example.com
+- password: Password@123
+
+## You will use manager account to create seller account 
+
+
