@@ -74,8 +74,16 @@ Base URL: \`http://localhost:3000/api/v1\`
 - \`src/seeders\` - Database seeders
 
 ## Default Admin Credentials
-- Username: admin
-- Password: admin123
+- email: admin@marketspoton.com
+- Password: Password@123
+
+## Default manager Credentials
+- email: manager1@example.com
+- password: Password@123
+
+## You will use manger account to create sellers in platform
+
+## Database SQL exports are in  Server/Sql folder you will find exported sql
 
 **Change these credentials immediately after first login!**
 `\`\`
