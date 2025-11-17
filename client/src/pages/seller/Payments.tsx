@@ -5,6 +5,7 @@ import { Download, CreditCard, Calendar } from 'lucide-react'
 import { format } from 'date-fns'
 import { authService } from '../../services/authService'
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 type PaymentItem = {
   payment_id: number
@@ -18,6 +19,7 @@ type PaymentItem = {
 const SellerPayments = () => {
   const { user } = useAuthStore()
   const userId = user?.userId
+  const navigate = useNavigate()
 
   // Fetch user profile to derive seller_id
   const { data: userProfileData, isLoading: userProfileLoading } = useQuery(
@@ -85,6 +87,69 @@ const SellerPayments = () => {
     URL.revokeObjectURL(url)
   }
 
+  const exportPdf = () => {
+    const printWindow = window.open('', '_blank', 'width=900,height=650')
+    if (!printWindow) return
+
+    const rowsHtml = filteredPayments.map((p) => {
+      const methodLabel = p.payment_method && p.payment_method.trim().length > 0
+        ? p.payment_method
+        : p.mobile_money_provider === 'lanari'
+        ? 'mobile_money_lanari'
+        : p.mobile_money_provider || 'unknown'
+      const dateLabel = p.payment_date
+        ? format(new Date(p.payment_date), 'MMM dd, yyyy')
+        : ''
+      return `
+        <tr>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;">#${p.payment_id}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;">$${Number(p.amount || 0).toFixed(2)}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${methodLabel.replace('_', ' ')}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${dateLabel}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${p.status || ''}</td>
+        </tr>
+      `
+    }).join('')
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <meta charSet="utf-8" />
+          <title>Payment History</title>
+          <style>
+            body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 24px; color: #111827; }
+            h1 { font-size: 24px; margin-bottom: 4px; }
+            p { margin-top: 0; margin-bottom: 16px; color: #6b7280; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th { text-align: left; padding: 8px; border-bottom: 2px solid #e5e7eb; background:#f9fafb; }
+          </style>
+        </head>
+        <body>
+          <h1>Payment History</h1>
+          <p>Exported on ${format(new Date(), 'yyyy-MM-dd HH:mm')}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Payment ID</th>
+                <th>Amount</th>
+                <th>Method</th>
+                <th>Date</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml || '<tr><td colspan="5" style="padding:16px;text-align:center;color:#6b7280;">No payments to display</td></tr>'}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
+    printWindow.focus()
+    printWindow.print()
+  }
+
   if (userProfileLoading || paymentsLoading) {
     return <div className="text-center py-12">Loading payments...</div>
   }
@@ -106,20 +171,31 @@ const SellerPayments = () => {
 
 
   return (
-    <div className="container space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">My Payments</h1>
-          <p className="text-gray-600 mt-1">View, filter, and export your payment history.</p>
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-40">
+      <div className="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="btn-secondary px-3 py-1 text-sm"
+            >
+              Back to Dashboard
+            </button>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">My Payments</h1>
+              <p className="text-gray-600 mt-1">View, filter, and export your payment history.</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button className="btn-secondary" onClick={exportCsv}>Export CSV</button>
+            <button className="btn-secondary" onClick={exportPdf}>Download PDF</button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button className="btn-secondary" onClick={exportCsv}>Export CSV</button>
-        </div>
-      </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="card">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="card">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Paid</p>
@@ -131,35 +207,35 @@ const SellerPayments = () => {
           </div>
         </div>
 
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Pending Payments</p>
-              <p className="text-2xl font-bold text-gray-900 mt-2">${pendingAmount.toFixed(2)}</p>
+          <div className="card">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Pending Payments</p>
+                <p className="text-2xl font-bold text-gray-900 mt-2">${pendingAmount.toFixed(2)}</p>
+              </div>
+              <div className="p-3 bg-yellow-100 rounded-lg">
+                <Calendar className="w-6 h-6 text-yellow-600" />
+              </div>
             </div>
-            <div className="p-3 bg-yellow-100 rounded-lg">
-              <Calendar className="w-6 h-6 text-yellow-600" />
+          </div>
+
+          <div className="card">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Revenue</p>
+                <p className="text-2xl font-bold text-gray-900 mt-2">${totalRevenue.toFixed(2)}</p>
+              </div>
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <CreditCard className="w-6 h-6 text-blue-600" />
+              </div>
             </div>
           </div>
         </div>
 
+        {/* Filters */}
         <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-              <p className="text-2xl font-bold text-gray-900 mt-2">${totalRevenue.toFixed(2)}</p>
-            </div>
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <CreditCard className="w-6 h-6 text-blue-600" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="card">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Payment History</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Payment History</h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
           <div>
             <label className="label">Search</label>
             <input className="input" placeholder="ID, amount, method, date" value={search} onChange={e => setSearch(e.target.value)} />
@@ -183,8 +259,8 @@ const SellerPayments = () => {
               <option value="card">Card</option>
             </select>
           </div>
-        </div>
-        <div className="overflow-x-auto">
+          </div>
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200">
@@ -263,6 +339,7 @@ const SellerPayments = () => {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </div>

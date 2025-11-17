@@ -20,7 +20,7 @@
 🔄 Lanari Payment Request: {
   amount: 10,
   customer_phone: '250790989830',
-  currency: 'RWF',
+  currency: '',
   description: 'Market Spot Payment - Allocation #3',
   reference_id: 'MKTS-1-3-1762885934037'
 }
@@ -44,11 +44,11 @@
 
 ### 1️⃣ **AMOUNT TOO SMALL** (Most Likely)
 
-**Your amount:** 10 RWF
+**Your amount:** 10 
 
-**Problem:** 10 RWF is probably below Lanari's minimum transaction amount.
+**Problem:** 10  is probably below Lanari's minimum transaction amount.
 
-**Solution:** Increase amount to 1000+ RWF
+**Solution:** Increase amount to 1000+ 
 
 ```json
 {
@@ -128,7 +128,7 @@ Try this exact request:
 ```
 
 **Changes made:**
-- ✅ Amount increased to 1000 RWF
+- ✅ Amount increased to 1000 
 - ✅ Used allocation_id 1 (seeded default)
 - ✅ Used seller_id 5 (likely exists)
 - ✅ Used common Rwanda phone format
@@ -196,7 +196,7 @@ Before testing, confirm:
 - [ ] allocation_id exists in database
 - [ ] seller_id exists in database
 - [ ] allocation belongs to seller (ALLOCATED status)
-- [ ] amount >= 1000 RWF (or Lanari's minimum)
+- [ ] amount >= 1000  (or Lanari's minimum)
 - [ ] customer_phone is valid Rwanda number
 - [ ] Server is running
 - [ ] .env has valid Lanari credentials
@@ -240,7 +240,7 @@ POST /api/v1/payments/lanari/process
 
 **Contact them if:**
 - You've tried with valid allocation/seller IDs
-- Amount is 5000+ RWF
+- Amount is 5000+ 
 - Phone number is valid
 - Still getting 400 error
 

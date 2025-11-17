@@ -77,7 +77,7 @@ Content-Type: application/json
 |-------|------|----------|-------------|
 | allocation_id | integer | ✅ | Space allocation ID |
 | seller_id | integer | ✅ | Seller ID |
-| amount | number | ✅ | Payment amount in RWF |
+| amount | number | ✅ | Payment amount in  |
 | customer_phone | string | ✅ | Customer phone (250788123456 format) |
 | payment_period_start | date | ❌ | Period start date |
 | payment_period_end | date | ❌ | Period end date |

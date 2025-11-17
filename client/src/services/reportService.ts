@@ -129,6 +129,68 @@ export const reportService = {
     }
   },
 
+  async getRevenueReport(startDate: string, endDate: string, zoneId?: number | string): Promise<any> {
+    try {
+      const { data } = await api.get('/reports/generate/revenue', {
+        params: {
+          start_date: startDate,
+          end_date: endDate,
+          zone_id: zoneId,
+        },
+      })
+      return data?.data || data
+    } catch (error) {
+      console.error('Error fetching revenue report:', error)
+      throw error
+    }
+  },
+
+  async getSellerReport(startDate: string, endDate: string, limit?: number): Promise<any> {
+    try {
+      const { data } = await api.get('/reports/generate/seller', {
+        params: {
+          start_date: startDate,
+          end_date: endDate,
+          limit,
+        },
+      })
+      return data?.data || data
+    } catch (error) {
+      console.error('Error fetching seller report:', error)
+      throw error
+    }
+  },
+
+  async getZoneStatistics(startDate: string, endDate: string): Promise<any> {
+    try {
+      const { data } = await api.get('/reports/statistics/zones', {
+        params: {
+          start_date: startDate,
+          end_date: endDate,
+        },
+      })
+      return data?.data || data
+    } catch (error) {
+      console.error('Error fetching zone statistics report:', error)
+      throw error
+    }
+  },
+
+  async getAllocationSummary(startDate: string, endDate: string): Promise<any> {
+    try {
+      const { data } = await api.get('/reports/statistics/allocations', {
+        params: {
+          start_date: startDate,
+          end_date: endDate,
+        },
+      })
+      return data?.data || data
+    } catch (error) {
+      console.error('Error fetching allocation summary report:', error)
+      throw error
+    }
+  },
+
   async exportReport(reportType: string, params: Record<string, any>): Promise<Blob> {
     try {
       // Not implemented; return empty blob for now to avoid UI crash

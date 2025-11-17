@@ -183,4 +183,4 @@ class MigrationManager {
   } finally {
     await manager.close();
   }
-})();
+)();

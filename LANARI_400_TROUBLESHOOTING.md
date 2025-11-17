@@ -155,14 +155,14 @@ Maybe Lanari expects different data types.
 **Possible issues:**
 - Amount should be integer (1000) not string ("1000") ✅ Your code does this
 - Phone should be string ("250788...") not number ✅ Your code does this
-- Currency should be exactly "RWF" (not "rwf" or "RW")
+- Currency should be exactly "" (not "" or "RW")
 
 **Check in your request:**
 ```json
 {
   "amount": 1000,           ← Should be number, not string
   "customer_phone": "250788123456",  ← Should be string
-  "currency": "RWF"         ← Check exact casing
+  "currency": ""         ← Check exact casing
 }
 ```
 
@@ -177,7 +177,7 @@ After making a payment request, look at console for:
 {
   amount: 1000,
   customer_phone: '250788123456',
-  currency: 'RWF',
+  currency: '',
   description: 'Market Spot Payment - Allocation #1',
   reference_id: 'MKTS-5-1-1762885...'
 }
@@ -247,7 +247,7 @@ When you test, try to answer:
 ### Round 5: Check Data Types
 - [ ] Verify amount is integer
 - [ ] Verify phone is string
-- [ ] Verify currency is "RWF" (uppercase)
+- [ ] Verify currency is "" (uppercase)
 - [ ] Verify all values present
 
 ---

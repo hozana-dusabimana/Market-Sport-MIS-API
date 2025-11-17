@@ -224,7 +224,7 @@ class PaymentController {
         amount: Math.round(amount),
         customer_phone: formattedPhone,
         description: `Market Spot Payment - Allocation #${allocation_id}`,
-        currency: 'RWF',
+        currency: '',
         reference_id: `MKTS-${seller_id}-${allocation_id}-${Date.now()}`
       });
 

@@ -3,8 +3,9 @@ import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { useAuthStore } from '../../store/authStore'
 import { notificationService } from '../../services/notificationService'
 import { sellerService } from '../../services/sellerService'
-import { Bell, ChevronDown, ChevronUp } from 'lucide-react'
+import { Bell, ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
+import { useNavigate } from 'react-router-dom'
 
 type NotificationItem = {
   notification_id: number
@@ -20,11 +21,23 @@ const SellerNotifications = () => {
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
   const [openId, setOpenId] = useState<number | null>(null)
+  const navigate = useNavigate()
 
   const { data: sellerProfile } = useQuery(
     ['seller-profile-for-notifs', user?.userId],
     () => sellerService.getByUserId(user!.userId),
     { enabled: !!user?.userId, retry: false }
+  )
+
+  const deleteMutation = useMutation(
+    (id: number) => notificationService.delete(id),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('seller-user-notifications')
+        queryClient.invalidateQueries(['seller-id-notifications', sellerId])
+        queryClient.invalidateQueries('seller-notifications')
+      },
+    }
   )
 
   const { data: notificationsUserData, isLoading: loadingUser } = useQuery(
@@ -79,6 +92,7 @@ const SellerNotifications = () => {
       onSuccess: () => {
         queryClient.invalidateQueries('seller-user-notifications')
         queryClient.invalidateQueries(['seller-id-notifications', sellerId])
+        queryClient.invalidateQueries('seller-notifications')
       },
     }
   )
@@ -109,6 +123,7 @@ const SellerNotifications = () => {
     onSuccess: () => {
       queryClient.invalidateQueries('seller-user-notifications')
       queryClient.invalidateQueries(['seller-id-notifications', sellerId])
+      queryClient.invalidateQueries('seller-notifications')
     }
   })
 
@@ -127,43 +142,83 @@ const SellerNotifications = () => {
   }
 
   return (
-    <div className="container space-y-6">
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Notifications</h1>
-          <p className="text-gray-600 mt-1">Unread: <span className="font-bold text-blue-900">{unreadCount}</span></p>
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-40">
+      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-6">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="btn-secondary px-3 py-1 text-sm"
+            >
+              Back to Dashboard
+            </button>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Notifications</h1>
+              <p className="text-gray-600 mt-1">
+                Unread: <span className="font-bold text-blue-900">{unreadCount}</span>
+              </p>
+            </div>
+          </div>
+          {unreadCount > 0 && (
+            <button onClick={() => markAllAsReadMutation.mutate()} className="btn-primary">
+              Mark All Read
+            </button>
+          )}
         </div>
-        {unreadCount > 0 && (
-          <button onClick={() => markAllAsReadMutation.mutate()} className="btn-primary">
-            Mark All Read
-          </button>
-        )}
-      </div>
 
-      <div className="space-y-4">
+        <div className="space-y-4">
         {notifications.length > 0 ? (
           notifications.map((notification) => {
             const isUnread = notification.status === 'unread' || !notification.is_read
             const isOpen = openId === notification.notification_id
-            let typeColor = 'bg-gray-50 border-gray-300'
-            if (notification.notification_type === 'payment') typeColor = 'bg-green-50 border-green-500'
-            else if (notification.notification_type === 'allocation') typeColor = 'bg-blue-50 border-blue-500'
-            else if (notification.notification_type === 'verification') typeColor = 'bg-yellow-50 border-yellow-500'
+
+            // Type-based colors for UNREAD notifications
+            let unreadTypeColor = 'bg-gray-50 border-gray-300'
+            if (notification.notification_type === 'payment') unreadTypeColor = 'bg-green-50 border-green-500'
+            else if (notification.notification_type === 'allocation') unreadTypeColor = 'bg-blue-50 border-blue-500'
+            else if (notification.notification_type === 'verification') unreadTypeColor = 'bg-yellow-50 border-yellow-500'
+
+            // Read notifications appear muted and gray
+            const readColor = 'bg-gray-50 border-gray-200 text-gray-500'
+            const cardColorClasses = isUnread ? `${unreadTypeColor} text-gray-900` : readColor
 
             return (
               <div
                 key={notification.notification_id}
-                className={`card border-l-4 cursor-pointer transition hover:shadow-lg ${typeColor} ${isUnread ? 'font-semibold' : 'font-normal'}`}
+                className={`card border-l-4 cursor-pointer transition hover:shadow-lg ${cardColorClasses} ${isUnread ? 'font-semibold' : 'font-normal'}`}
                 onClick={() => handleToggle(notification)}
               >
                 <div className="flex justify-between items-center p-4">
-                  <div>
-                    <h3 className="text-lg text-gray-900">{notification.title}</h3>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {notification.created_at && format(new Date(notification.created_at), 'MMM dd, yyyy HH:mm')}
-                    </p>
+                  <div className="flex items-start gap-3">
+                    <span
+                      className={`mt-1 inline-block h-2.5 w-2.5 rounded-full ${
+                        isUnread ? 'bg-blue-500' : 'bg-gray-300'
+                      }`}
+                    />
+                    <div>
+                      <h3 className="text-lg text-gray-900">{notification.title}</h3>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {notification.created_at && format(new Date(notification.created_at), 'MMM dd, yyyy HH:mm')}
+                      </p>
+                    </div>
                   </div>
-                  {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (window.confirm('Delete this notification?')) {
+                          deleteMutation.mutate(notification.notification_id)
+                        }
+                      }}
+                      className="text-red-600 hover:text-red-700"
+                      title="Delete notification"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                    {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                  </div>
                 </div>
                 {isOpen && (
                   <div className="px-4 pb-4 text-gray-700 border-t border-gray-200">
@@ -179,6 +234,7 @@ const SellerNotifications = () => {
             <p className="text-gray-600">No notifications</p>
           </div>
         )}
+        </div>
       </div>
     </div>
   )

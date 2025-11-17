@@ -200,7 +200,7 @@ For testing with test allocation:
 {
   "allocation_id": 1,           // From your database
   "seller_id": 5,               // From your database
-  "amount": 1000,               // Amount in RWF
+  "amount": 1000,               // Amount in 
   "customer_phone": "250788123456",  // Valid Rwanda phone
   "payment_period_start": "2025-01-01",
   "payment_period_end": "2025-01-31",

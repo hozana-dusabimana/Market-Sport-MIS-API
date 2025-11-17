@@ -23,6 +23,8 @@ const ManagerPayments = () => {
     payment_method: 'mobile_money',
     payment_date: format(new Date(), 'yyyy-MM-dd'),
     status: 'completed',
+    mobile_money_number: '',
+    mobile_money_provider: '',
   })
 
   const queryClient = useQueryClient()
@@ -69,6 +71,57 @@ const ManagerPayments = () => {
     onError: (error: any) => toast.error(error.response?.data?.message || 'Failed to record payment'),
   })
 
+  const lanariMutation = useMutation(
+    (payload: {
+      allocation_id: number
+      seller_id: number
+      amount: number
+      customer_phone: string
+      payment_period_start?: string
+      payment_period_end?: string
+      notes?: string
+    }) => paymentService.lanariProcess(payload),
+    {
+      onSuccess: (res) => {
+        queryClient.invalidateQueries('payments')
+
+        const apiSuccess = (res as any)?.success !== undefined ? (res as any).success : true
+        const status = (res as any)?.data?.status || (res as any)?.status
+        const ussdCode =
+          (res as any)?.data?.ussd_code ||
+          (res as any)?.data?.ussd ||
+          (res as any)?.ussd_code ||
+          (res as any)?.ussd
+
+        if (!apiSuccess) {
+          const msg = (res as any)?.message || 'Failed to initiate mobile money payment'
+          toast.error(msg)
+          return
+        }
+
+        if (status === 'completed') {
+          toast.success('Mobile money payment completed successfully')
+        } else if (ussdCode) {
+          toast.success(`Payment initiated. Dial ${ussdCode} on the phone to complete the payment.`)
+        } else {
+          toast.success('Payment initiated. Please approve the USSD prompt on the phone. Status: pending')
+        }
+
+        setIsModalOpen(false)
+        resetForm()
+      },
+      onError: (err: any) => {
+        const status = err?.response?.status
+        const serverMsg = err?.response?.data?.message || err?.message || ''
+        if (status === 401 && /api key.*secret required/i.test(serverMsg)) {
+          toast.error('Mobile money is not configured. Please contact the administrator or use another payment method.')
+        } else {
+          toast.error(`Failed to initiate mobile money payment: ${serverMsg}`)
+        }
+      },
+    }
+  )
+
   const resetForm = () => {
     setFormData({
       allocation_id: 0,
@@ -77,6 +130,8 @@ const ManagerPayments = () => {
       payment_method: 'mobile_money',
       payment_date: format(new Date(), 'yyyy-MM-dd'),
       status: 'completed',
+      mobile_money_number: '',
+      mobile_money_provider: '',
     })
   }
 
@@ -86,6 +141,30 @@ const ManagerPayments = () => {
       toast.error('Please fill in all required fields')
       return
     }
+
+    const amountValue = Number(formData.amount) || 0
+
+    if (formData.payment_method === 'mobile_money') {
+      if (amountValue < 100) {
+        toast.error('Minimum mobile money payment is 100 .')
+        return
+      }
+
+      if (!formData.mobile_money_number) {
+        toast.error('Please enter a mobile money phone number')
+        return
+      }
+
+      lanariMutation.mutate({
+        allocation_id: formData.allocation_id!,
+        seller_id: formData.seller_id!,
+        amount: amountValue,
+        customer_phone: formData.mobile_money_number,
+        notes: formData.notes,
+      })
+      return
+    }
+
     createMutation.mutate(formData as Payment)
   }
 
@@ -201,12 +280,40 @@ const ManagerPayments = () => {
               <input type="number" step="0.01" placeholder="Amount ($)" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: parseFloat(e.target.value) || 0})} required className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"/>
               <select value={formData.payment_method} onChange={e => setFormData({...formData, payment_method: e.target.value as any})} required className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400">
                 <option value="mobile_money">Mobile Money</option>
-                <option value="bank_transfer">Bank Transfer</option>
-                <option value="cash">Cash</option>
-                <option value="card">Card</option>
               </select>
+              {formData.payment_method === 'mobile_money' && (
+                <>
+                  <input
+                    type="tel"
+                    placeholder="Mobile Money Number (seller or manager phone)"
+                    value={formData.mobile_money_number || ''}
+                    onChange={e => setFormData({ ...formData, mobile_money_number: e.target.value })}
+                    required
+                    className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                  <select
+                    value={formData.mobile_money_provider || ''}
+                    onChange={e => setFormData({ ...formData, mobile_money_provider: e.target.value })}
+                    className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  >
+                    <option value="">Select Provider</option>
+                    <option value="mtn">MTN</option>
+                    <option value="airtel">Airtel</option>
+                    <option value="orange">Orange</option>
+                  </select>
+                  <p className="text-xs text-gray-500">
+                    You will receive a USSD prompt or code on the provided phone to approve this payment.
+                  </p>
+                </>
+              )}
               <div className="flex justify-end gap-2">
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">Record Payment</button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                  disabled={createMutation.isLoading || lanariMutation.isLoading}
+                >
+                  {createMutation.isLoading || lanariMutation.isLoading ? 'Processing...' : 'Record Payment'}
+                </button>
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 transition">Cancel</button>
               </div>
             </form>

@@ -49,4 +49,3 @@ export async function down(connection) {
   await connection.query('DROP TABLE IF EXISTS sellers');
   await connection.query('DROP TABLE IF EXISTS managers');
   await connection.query('DROP TABLE IF EXISTS admins');
-}

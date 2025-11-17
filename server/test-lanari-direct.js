@@ -33,7 +33,7 @@ const testPayload = {
   api_secret: apiSecret,
   amount: 1000,
   customer_phone: '250788123456',
-  currency: 'RWF',
+  currency: '',
   description: 'Test payment',
   reference_id: `TEST-${Date.now()}`
 };

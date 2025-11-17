@@ -155,7 +155,7 @@ If any exist, use those!
 |-----------|--------|------------|
 | Request format | ✅ Valid | Correct JSON structure |
 | Phone formatting | ✅ Valid | 0790989830 → 250790989830 |
-| Amount | ⚠️ Too small? | 10 RWF may be too small |
+| Amount | ⚠️ Too small? | 10  may be too small |
 | Credentials | ✅ Valid | Passed authentication |
 | **Allocation/Seller match** | ❌ **Invalid!** | **seller_id 1 is not a real seller** |
 

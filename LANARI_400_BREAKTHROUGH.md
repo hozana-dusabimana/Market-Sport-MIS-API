@@ -119,7 +119,7 @@ Test request I'm sending:
   "api_secret": "cf034117f2ecf6c5048115fc710d27e51284a9cd57223d9bf689ccb0f08a1368...",
   "amount": 1000,
   "customer_phone": "250788123456",
-  "currency": "RWF",
+  "currency": "",
   "description": "Test payment"
 }"
 ```

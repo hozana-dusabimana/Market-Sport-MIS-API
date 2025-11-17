@@ -6,6 +6,7 @@ import { allocationService } from '../../services/allocationService'
 import { userService } from '../../services/userService'
 import { sellerService } from '../../services/sellerService'
 import { MapPin, Square, Users, TrendingUp, DollarSign, UserCheck, Plus, ListChecks, BellRing } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { format, subMonths } from 'date-fns'
 
 const AdminDashboard = () => {
@@ -13,7 +14,6 @@ const AdminDashboard = () => {
   const { data: zonesData, isLoading: loadingZones } = useQuery('zones', () => zoneService.getAll())
   const { data: spacesData, isLoading: loadingSpaces } = useQuery('spaces', () => spaceService.getAll())
   const { data: allocations, isLoading: loadingAllocations } = useQuery('allocations', () => allocationService.getAll())
-  const { data: userStats, isLoading: loadingUserStats } = useQuery('user-statistics', () => userService.getStatistics())
   const { data: sellerStatusCount, isLoading: loadingSellerStatus } = useQuery('seller-status-count', () => sellerService.getCountByStatus())
 
   const zones = zonesData?.data || []
@@ -139,50 +139,40 @@ const AdminDashboard = () => {
         <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
           <h2 className="text-xl font-bold text-gray-900 mb-4 border-b pb-2">Quick Actions</h2>
           <div className="space-y-3">
-            <button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center group">
+            <Link
+              to="/sellers"
+              className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center group"
+            >
               <Plus className="w-5 h-5 mr-2 group-hover:rotate-90 transition-transform" />
-              Register New Seller
-            </button>
-            <button className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-3 px-4 rounded-lg transition-colors flex items-center">
+              <span>Register New Seller</span>
+            </Link>
+            <Link
+              to="/zones"
+              className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-3 px-4 rounded-lg transition-colors flex items-center"
+            >
               <MapPin className="w-5 h-5 mr-2 text-blue-600" />
-              Create New Zone
-            </button>
-            <button className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-3 px-4 rounded-lg transition-colors flex items-center">
+              <span>Create New Zone</span>
+            </Link>
+            <Link
+              to="/reports"
+              className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-3 px-4 rounded-lg transition-colors flex items-center"
+            >
               <ListChecks className="w-5 h-5 mr-2 text-green-600" />
-              View Comprehensive Reports
-            </button>
-            <button className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-3 px-4 rounded-lg transition-colors flex items-center">
+              <span>View Comprehensive Reports</span>
+            </Link>
+            <Link
+              to="/notifications"
+              className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-3 px-4 rounded-lg transition-colors flex items-center"
+            >
               <BellRing className="w-5 h-5 mr-2 text-orange-600" />
-              Manage Notifications
-            </button>
+              <span>Manage Notifications</span>
+            </Link>
           </div>
         </div>
       </div>
       
-      {/* 👤 3. User & Seller Statistics */}
+      {/* 👤 3. Seller Statistics */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        {/* User Statistics Card */}
-        {userStats?.data && (
-          <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-            <h2 className="text-xl font-bold text-gray-900 mb-4 border-b pb-2">User Accounts Overview</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {userStats.data.map((stat) => (
-                <div key={stat.user_type} className="bg-gray-50 p-4 rounded-lg border-l-4 border-teal-500">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-semibold text-teal-700 capitalize">{stat.user_type}s</span>
-                    <UserCheck className="w-5 h-5 text-gray-400" />
-                  </div>
-                  <p className="text-3xl font-extrabold text-blue-900">{stat.total || 0}</p>
-                  <div className="space-y-1 mt-2 text-xs">
-                    <p className="text-green-600">Active: <span className="font-bold">{stat.active || 0}</span></p>
-                    <p className="text-red-600">Suspended: <span className="font-bold">{stat.suspended || 0}</span></p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        
         {/* Seller Verification Card */}
         {sellerStatusCount?.data && (
           <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">

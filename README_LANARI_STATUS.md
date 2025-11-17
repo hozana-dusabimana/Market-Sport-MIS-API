@@ -197,7 +197,7 @@ Test missing fields:
 4. Server calls Lanari via PowerShell wrapper
    
 5. Lanari sends SMS to customer phone
-   "Confirm payment RWF 100? Reply: 1"
+   "Confirm payment  100? Reply: 1"
    
 6. Server returns transaction_id to frontend
    

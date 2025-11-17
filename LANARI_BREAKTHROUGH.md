@@ -94,7 +94,7 @@ This means:
   api_secret: "cf034117f2ecf6c5048115fc710d27e51284a9cd57223d9bf689ccb0f08a1368d4a3e282a8071a528ab660b564da11a4fa0f661da56b0ed2992d93569b1d5488",
   amount: 100,
   customer_phone: "250790989830",
-  currency: "RWF",
+  currency: "",
   description: "Payment description",
   reference_id: "UNIQUE-ID"
 }
@@ -141,7 +141,7 @@ Our full request:
   api_secret: "...",
   amount: 100,
   customer_phone: "250790989830",
-  currency: "RWF",
+  currency: "",
   description: "Test payment"
 }
 
@@ -152,7 +152,7 @@ Thank you for your support.
 - MTN Mobile Money
 - Airtel Money
 - Bank transfer
-- Other RWF payment gateways
+- Other  payment gateways
 
 ## 🔬 Technical Details
 
@@ -229,7 +229,7 @@ try {
 ```
 Test Time: November 12, 2025
 Test Method: Direct PowerShell script
-Request: 100 RWF payment, phone 250790989830
+Request: 100  payment, phone 250790989830
 Response: Valid JSON from Lanari with transaction_ref
 
 Result: SUCCESS - Got real Lanari response!
