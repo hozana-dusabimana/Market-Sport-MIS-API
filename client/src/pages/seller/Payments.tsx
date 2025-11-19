@@ -27,7 +27,11 @@ const SellerPayments = () => {
     () => authService.getProfile(),
     { enabled: !!userId, retry: false, onError: () => {} }
   )
-  const sellerId = userProfileData?.data?.profile?.seller_id || userProfileData?.data?.user_id || userId
+  // Handle API response structure: { success: true, data: { ...user, profile } }
+  const userProfileAny = userProfileData as any
+  const userObj = userProfileAny?.data || userProfileAny
+  const profileObj = userObj?.profile || {}
+  const sellerId = profileObj?.seller_id || userObj?.user_id || userId
 
   // Fetch payments
   const { data: paymentsData, isLoading: paymentsLoading } = useQuery(
@@ -103,7 +107,7 @@ const SellerPayments = () => {
       return `
         <tr>
           <td style="padding:8px;border-bottom:1px solid #e5e7eb;">#${p.payment_id}</td>
-          <td style="padding:8px;border-bottom:1px solid #e5e7eb;">$${Number(p.amount || 0).toFixed(2)}</td>
+          <td style="padding:8px;border-bottom:1px solid #e5e7eb;">RWF ${(Number(p.amount || 0)).toFixed(2)}</td>
           <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${methodLabel.replace('_', ' ')}</td>
           <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${dateLabel}</td>
           <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${p.status || ''}</td>
@@ -199,7 +203,7 @@ const SellerPayments = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Paid</p>
-              <p className="text-2xl font-bold text-gray-900 mt-2">${totalPaid.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900 mt-2">RWF {totalPaid.toFixed(2)}</p>
             </div>
             <div className="p-3 bg-green-100 rounded-lg">
               <CreditCard className="w-6 h-6 text-green-600" />
@@ -211,7 +215,7 @@ const SellerPayments = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Pending Payments</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">${pendingAmount.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-gray-900 mt-2">RWF {pendingAmount.toFixed(2)}</p>
               </div>
               <div className="p-3 bg-yellow-100 rounded-lg">
                 <Calendar className="w-6 h-6 text-yellow-600" />
@@ -223,7 +227,7 @@ const SellerPayments = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">${totalRevenue.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-gray-900 mt-2">RWF {totalRevenue.toFixed(2)}</p>
               </div>
               <div className="p-3 bg-blue-100 rounded-lg">
                 <CreditCard className="w-6 h-6 text-blue-600" />
@@ -283,10 +287,10 @@ const SellerPayments = () => {
                   return (
                     <tr key={payment.payment_id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-3 px-4">#{payment.payment_id}</td>
-                      <td className="py-3 px-4 font-medium">${Number(payment.amount || 0).toFixed(2)}</td>
+                      <td className="py-3 px-4 font-medium">RWF {Number(payment.amount || 0).toFixed(2)}</td>
                       <td className="py-3 px-4 capitalize">{methodLabel.replace('_', ' ')}</td>
                     <td className="py-3 px-4">
-                      {format(new Date(payment.payment_date), 'MMM dd, yyyy')}
+                      {payment.payment_date ? format(new Date(payment.payment_date), 'MMM dd, yyyy') : 'N/A'}
                     </td>
                     <td className="py-3 px-4">
                       <span

@@ -63,7 +63,7 @@ const AdminDashboard = () => {
     },
     {
       name: 'Monthly Revenue',
-      value: loadingRevenue ? '...' : `$${totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+      value: loadingRevenue ? '...' : `RWF ${totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
       icon: DollarSign,
       color: 'bg-orange-500',
       description: `Revenue since ${format(subMonths(new Date(), 1), 'MMM d')}.`,

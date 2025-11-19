@@ -186,14 +186,14 @@ const ManagerPayments = () => {
         <div className="p-4 bg-white rounded shadow flex items-center justify-between">
           <div>
             <p className="text-gray-500 text-sm">Total Revenue</p>
-            <h2 className="text-xl font-semibold">${totalRevenue.toFixed(2)}</h2>
+            <h2 className="text-xl font-semibold">RWF {totalRevenue.toFixed(2)}</h2>
           </div>
           <DollarSign size={28} className="text-green-500" />
         </div>
         {Object.entries(revenueByMethod).map(([method, total]) => (
           <div key={method} className="p-4 bg-white rounded shadow flex flex-col justify-center items-start">
             <p className="text-gray-500 capitalize text-sm">{method.replace('_', ' ')}</p>
-            <h3 className="text-lg font-medium">${total.toFixed(2)}</h3>
+            <h3 className="text-lg font-medium">RWF {total.toFixed(2)}</h3>
           </div>
         ))}
       </section>
@@ -233,7 +233,7 @@ const ManagerPayments = () => {
                 <tr key={p.payment_id} className="hover:bg-gray-50">
                   <td className="px-4 py-2 text-sm text-gray-700">#{p.payment_id}</td>
                   <td className="px-4 py-2 text-sm text-gray-700">{seller?.business_name || seller?.full_name || `Seller #${p.seller_id}`}</td>
-                  <td className="px-4 py-2 text-sm text-gray-700">${Number(p.amount).toFixed(2)}</td>
+                  <td className="px-4 py-2 text-sm text-gray-700">RWF {Number(p.amount).toFixed(2)}</td>
                   <td className="px-4 py-2 text-sm text-gray-700">{p.payment_method.replace('_',' ')}</td>
                   <td className="px-4 py-2 text-sm text-gray-700">{format(new Date(p.payment_date), 'MMM dd, yyyy')}</td>
                   <td className={`px-4 py-2 text-sm font-medium capitalize ${p.status === 'completed' ? 'text-green-600' : p.status === 'pending' ? 'text-yellow-500' : 'text-red-500'}`}>

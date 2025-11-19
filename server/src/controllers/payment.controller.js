@@ -224,14 +224,14 @@ class PaymentController {
         amount: Math.round(amount),
         customer_phone: formattedPhone,
         description: `Market Spot Payment - Allocation #${allocation_id}`,
-        currency: '',
+        currency: 'RWF',
         reference_id: `MKTS-${seller_id}-${allocation_id}-${Date.now()}`
       });
 
       // Check gateway response for immediate success
       const gatewaySuccess = lanariResponse.raw_response?.gateway_response?.data?.status === 'SUCCESSFUL';
       const paymentStatus = gatewaySuccess ? 'completed' : (lanariResponse.success ? 'pending' : 'failed');
-      
+
       const paymentId = await Payment.create({
         allocation_id,
         seller_id,
@@ -563,7 +563,7 @@ class PaymentController {
     }
   }
 
-  
+
 }
 
 export default new PaymentController();

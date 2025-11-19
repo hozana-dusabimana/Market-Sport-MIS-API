@@ -220,7 +220,7 @@ const Payments = () => {
                 {revenueByMethod.data.map((method: any) => (
                   <div key={method.payment_method} className="bg-gray-50 p-3 rounded-lg">
                     <p className="text-xs text-gray-600 capitalize">{method.payment_method?.replace('_', ' ')}</p>
-                    <p className="text-lg font-bold">${(method.total || 0).toFixed(2)}</p>
+                    <p className="text-lg font-bold">RWF {(method.total || 0).toFixed(2)}</p>
                   </div>
                 ))}
               </div>
@@ -274,7 +274,7 @@ const Payments = () => {
                 <tr key={p.payment_id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="py-3 px-4">#{p.payment_id}</td>
                   <td className="py-3 px-4">{seller?.full_name || seller?.business_name || p.seller_id}</td>
-                  <td className="py-3 px-4 font-medium">${p.amount}</td>
+                  <td className="py-3 px-4 font-medium">RWF {p.amount}</td>
                   <td className="py-3 px-4 capitalize">{p.payment_method?.replace('_', ' ')}</td>
                   <td className="py-3 px-4">{format(new Date(p.payment_date), 'MMM dd, yyyy')}</td>
                   <td className="py-3 px-4">

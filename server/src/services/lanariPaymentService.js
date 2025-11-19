@@ -9,7 +9,7 @@ class LanariPaymentService {
 
   formatPhoneNumber(phone) {
     let formattedPhone = String(phone || '').trim().replace(/\s+/g, '').replace(/^\+/, '');
-    
+
     if (!formattedPhone) {
       throw new Error('Phone number is empty after formatting');
     }
@@ -36,7 +36,7 @@ class LanariPaymentService {
 
   async processPayment(paymentData) {
     try {
-      const { amount, customer_phone, description, currency = '' } = paymentData;
+      const { amount, customer_phone, description, currency = 'RWF' } = paymentData;
 
       if (!amount || amount <= 0) {
         throw new Error('Invalid payment amount');
@@ -140,7 +140,7 @@ class LanariPaymentService {
 
     } catch (error) {
       console.error('✗ [PAYMENT] Payment error:', error.message);
-      
+
       if (error.response) {
         const errorData = error.response.data;
         return {
@@ -150,7 +150,7 @@ class LanariPaymentService {
           raw_response: errorData
         };
       }
-      
+
       if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
         return {
           success: false,
@@ -158,7 +158,7 @@ class LanariPaymentService {
           timeout: true
         };
       }
-      
+
       return {
         success: false,
         error: error.message || 'Payment service unavailable',

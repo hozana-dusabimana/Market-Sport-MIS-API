@@ -349,7 +349,7 @@ const Spaces = () => {
                       <td className="py-3 px-4 text-sm">{zone?.zone_name || 'N/A'}</td>
                       <td className="py-3 px-4 text-sm capitalize">{space.space_type}</td>
                       <td className="py-3 px-4 text-sm font-medium">
-                        ${displayRate.toFixed(2)}
+                        RWF {displayRate.toFixed(2)}
                       </td>
                       <td className="py-3 px-4">
                         <select
@@ -637,7 +637,7 @@ const Spaces = () => {
                               <td className="py-2 px-4">{history.end_date ? new Date(history.end_date).toLocaleDateString() : 'N/A'}</td>
                               {/* FIX: Use parseFloat for total_revenue */}
                               <td className="py-2 px-4 text-right font-semibold text-sm text-green-700">
-                                ${(parseFloat(history.total_revenue) || 0).toFixed(2)}
+                                RWF {(parseFloat(history.total_revenue) || 0).toFixed(2)}
                               </td>
                             </tr>
                           ))}
@@ -685,7 +685,7 @@ const RatePill = ({ label, rate, color }) => {
       <DollarSign size={24} />
       <p className="text-2xl font-bold mt-2">
         {/* FIX: Use parseFloat for rate */}
-        ${(parseFloat(rate) || 0).toFixed(2)}
+        RWF {(parseFloat(rate) || 0).toFixed(2)}
       </p>
       <p className="text-xs font-semibold uppercase mt-1 opacity-80">{label}</p>
     </div>

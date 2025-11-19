@@ -40,7 +40,13 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status
-    if (status === 401) {
+    // Don't redirect on 401 if we're already on login/register pages (let the component handle the error)
+    const isAuthPage = window.location.pathname === '/login' || 
+                      window.location.pathname === '/register' ||
+                      window.location.pathname === '/forgot-password' ||
+                      window.location.pathname === '/reset-password'
+    
+    if (status === 401 && !isAuthPage) {
       console.warn('Unauthorized - Logging out')
       useAuthStore.getState().logout()
       window.location.href = '/login'

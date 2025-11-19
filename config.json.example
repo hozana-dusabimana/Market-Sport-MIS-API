@@ -45,7 +45,7 @@
   },
   "payment": {
     "methods": ["mobile_money", "bank_transfer", "cash", "card"],
-    "defaultCurrency": "USD",
+    "defaultCurrency": "RWF",
     "mobileMoneyProviders": ["mtn", "airtel", "vodafone"]
   },
   "logging": {

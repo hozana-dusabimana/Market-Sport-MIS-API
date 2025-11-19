@@ -82,7 +82,7 @@ const SellerSpaces = () => {
                     )}
                     <div className="flex items-center space-x-2">
                       <DollarSign size={16} />
-                      <span className="font-semibold text-gray-900">${monthlyRate}/month</span>
+                      <span className="font-semibold text-gray-900">RWF {monthlyRate}/month</span>
                     </div>
                     {space?.zone_id && (
                       <div className="text-xs text-gray-500 mt-1">
@@ -122,7 +122,7 @@ const SellerSpaces = () => {
                         <td className="py-3 px-4">{space?.space_number || space?.space_code || `Space #${allocation.space_id}`}</td>
                         <td className="py-3 px-4">{allocation.start_date ? format(parseISO(allocation.start_date), 'MMM dd, yyyy') : 'N/A'}</td>
                         <td className="py-3 px-4">{allocation.end_date ? format(parseISO(allocation.end_date), 'MMM dd, yyyy') : 'N/A'}</td>
-                        <td className="py-3 px-4">${monthlyRate}</td>
+                        <td className="py-3 px-4">RWF {monthlyRate}</td>
                         <td className="py-3 px-4">
                           <span className={`px-2 py-1 rounded text-xs ${
                             allocation.status === 'expired' ? 'bg-gray-100 text-gray-800' :

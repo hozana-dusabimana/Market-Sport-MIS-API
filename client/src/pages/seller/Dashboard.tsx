@@ -331,14 +331,14 @@ const SellerDashboard = () => {
     },
     {
       name: 'Total Paid',
-      value: `$${totalPaid.toFixed(2)}`,
+      value: `RWF ${totalPaid.toFixed(2)}`,
       icon: DollarSign,
       color: 'bg-green-500',
       link: '/my-payments',
     },
     {
       name: 'Pending Payments',
-      value: `$${pendingAmount.toFixed(2)}`,
+      value: `RWF ${pendingAmount.toFixed(2)}`,
       icon: CreditCard,
       color: 'bg-yellow-500',
       link: '/my-payments',
@@ -507,7 +507,7 @@ const SellerDashboard = () => {
             </div>
             <div className="bg-gray-50 p-4 rounded-lg">
               <p className="text-sm text-gray-600">Total Paid</p>
-              <p className="text-2xl font-bold text-green-600">${Number(sellerStats.data?.total_paid ?? totalPaid).toFixed(2)}</p>
+              <p className="text-2xl font-bold text-green-600">RWF {Number(sellerStats.data?.total_paid ?? totalPaid).toFixed(2)}</p>
             </div>
           </div>
         </div>
@@ -567,7 +567,7 @@ const SellerDashboard = () => {
                       </div>
                       <div>
                         <p className="text-gray-600">Monthly Rate</p>
-                        <p className="font-medium text-gray-900">${Number(monthlyRate).toFixed(2)}</p>
+                        <p className="font-medium text-gray-900">RWF {Number(monthlyRate).toFixed(2)}</p>
                       </div>
                       {allocation.end_date && (
                         <div className="col-span-2">
@@ -699,7 +699,7 @@ const SellerDashboard = () => {
                 <div key={payment.payment_id} className="border-b border-gray-200 pb-3 last:border-0">
                   <div className="flex justify-between items-center">
                     <div className="flex-1">
-                      <p className="font-medium text-gray-900">${Number(payment.amount || 0).toFixed(2)}</p>
+                      <p className="font-medium text-gray-900">RWF {Number(payment.amount || 0).toFixed(2)}</p>
                       <p className="text-sm text-gray-600">
                         {format(new Date(payment.payment_date), 'MMM dd, yyyy')} • {payment.payment_method.replace('_', ' ')}
                       </p>
@@ -833,7 +833,7 @@ const SellerDashboard = () => {
             {upcomingPayments.map((payment: any, index: number) => (
               <div key={index} className="border border-yellow-200 bg-yellow-50 rounded-lg p-4">
                 <p className="text-sm text-gray-600">Space: {payment.space?.space_number || payment.space?.space_code || 'N/A'}</p>
-                <p className="text-lg font-bold text-gray-900 mt-1">${Number(payment.amount).toFixed(2)}</p>
+                <p className="text-lg font-bold text-gray-900 mt-1">RWF {Number(payment.amount).toFixed(2)}</p>
                 <p className="text-sm text-gray-600 mt-2">
                   Due: {format(payment.nextDueDate, 'MMM dd, yyyy')}
                 </p>
@@ -871,15 +871,15 @@ const SellerDashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div className="bg-gray-50 p-4 rounded-lg">
                 <p className="text-sm text-gray-600">Total Revenue</p>
-                <p className="text-2xl font-bold text-gray-900">${totalRevenue.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-gray-900">RWF {totalRevenue.toFixed(2)}</p>
               </div>
               <div className="bg-green-50 p-4 rounded-lg">
                 <p className="text-sm text-gray-600">Total Paid</p>
-                <p className="text-2xl font-bold text-green-600">${totalPaid.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-green-600">RWF {totalPaid.toFixed(2)}</p>
               </div>
               <div className="bg-yellow-50 p-4 rounded-lg">
                 <p className="text-sm text-gray-600">Pending Amount</p>
-                <p className="text-2xl font-bold text-yellow-600">${pendingAmount.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-yellow-600">RWF {pendingAmount.toFixed(2)}</p>
               </div>
             </div>
             
@@ -896,7 +896,7 @@ const SellerDashboard = () => {
                 ).map(([method, amount]: [string, any]) => (
                   <div key={method} className="flex justify-between items-center py-2 border-b border-gray-200">
                     <span className="text-sm text-gray-600 capitalize">{method.replace('_', ' ')}</span>
-                    <span className="font-medium text-gray-900">${Number(amount).toFixed(2)}</span>
+                    <span className="font-medium text-gray-900">RWF {Number(amount).toFixed(2)}</span>
                   </div>
                 ))}
               </div>
@@ -919,7 +919,7 @@ const SellerDashboard = () => {
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis dataKey="month" tick={{ fill: '#6b7280', fontSize: 12 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} axisLine={false} tickLine={false} width={40} />
-                    <Tooltip formatter={(v: any) => [`$${Number(v).toFixed(2)}`, 'Total']} labelClassName="text-gray-700" />
+                    <Tooltip formatter={(v: any) => [`RWF ${Number(v).toFixed(2)}`, 'Total']} labelClassName="text-gray-700" />
                     <Area type="monotone" dataKey="value" stroke="#3b82f6" fill="url(#colorPay)" strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -931,7 +931,7 @@ const SellerDashboard = () => {
                   .map(([month, amount]: [string, any]) => (
                     <div key={month} className="flex justify-between items-center py-2 border-b border-gray-200">
                       <span className="text-sm text-gray-600">{format(new Date(month + '-01'), 'MMMM yyyy')}</span>
-                      <span className="font-medium text-gray-900">${Number(amount).toFixed(2)}</span>
+                      <span className="font-medium text-gray-900">RWF {Number(amount).toFixed(2)}</span>
                     </div>
                   ))}
               </div>
@@ -1021,7 +1021,7 @@ const SellerDashboard = () => {
                     return (
                       <div className="flex flex-col gap-1">
                         <span>
-                          Suggested amount: <strong>${Number(suggested).toFixed(2)}</strong>
+                          Suggested amount: <strong>RWF {Number(suggested).toFixed(2)}</strong>
                         </span>
                         {nextEnd && (
                           <span>

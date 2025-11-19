@@ -401,7 +401,7 @@ const Zones = () => {
                   <StatPill label="Total Spaces" value={zoneStatistics.total_spaces || 0} color="teal" />
                   <StatPill label="Occupied" value={zoneStatistics.occupied_spaces || 0} color="blue" />
                   <StatPill label="Total Allocations" value={zoneStatistics.total_allocations || 0} color="purple" />
-                  <StatPill label="Total Revenue" value={`$${(zoneStatistics.total_revenue || 0).toFixed(2)}`} color="orange" />
+                  <StatPill label="Total Revenue" value={`RWF ${(zoneStatistics.total_revenue || 0).toFixed(2)}`} color="orange" />
                 </div>
               </div>
             )}
@@ -435,7 +435,7 @@ const Zones = () => {
                             </span>
                           </td>
                           <td className="py-2 px-4 text-right font-semibold text-sm">
-                            ${(space.monthly_rate || space.daily_rate || 0).toFixed(2)}
+                            RWF {(space.monthly_rate || space.daily_rate || 0).toFixed(2)}
                           </td>
                         </tr>
                       ))}

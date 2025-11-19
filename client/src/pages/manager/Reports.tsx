@@ -239,7 +239,7 @@ const ManagerReports = () => {
                           <div className="bg-blue-50 p-4 rounded-lg">
                             <p className="text-sm text-gray-600">Total Revenue</p>
                             <p className="text-2xl font-bold text-gray-900">
-                              ${safeNumber(data.total_revenue).toFixed(2)}
+                              RWF {safeNumber(data.total_revenue).toFixed(2)}
                             </p>
                           </div>
                           <div className="bg-green-50 p-4 rounded-lg">

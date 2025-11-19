@@ -11,7 +11,10 @@
     "apiVersion": "v1",
     "baseUrl": "http://localhost:3000",
     "cors": {
-      "origin": ["http://localhost:5173", "http://localhost:3000"],
+      "origin": [
+        "http://localhost:5173",
+        "http://localhost:3000"
+      ],
       "credentials": true
     }
   },
@@ -44,13 +47,21 @@
     "enableRealTime": false
   },
   "payment": {
-    "methods": ["mobile_money", "bank_transfer", "cash", "card"],
-    "defaultCurrency": "USD",
-    "mobileMoneyProviders": ["mtn", "airtel", "vodafone"]
+    "methods": [
+      "mobile_money",
+      "bank_transfer",
+      "cash",
+      "card"
+    ],
+    "defaultCurrency": "RWF",
+    "mobileMoneyProviders": [
+      "mtn",
+      "airtel",
+      "vodafone"
+    ]
   },
   "logging": {
     "level": "info",
     "format": "combined"
   }
 }
-

@@ -378,7 +378,7 @@ const Reports = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div className="bg-blue-50 p-4 rounded-lg">
                   <p className="text-sm text-gray-600">Total Revenue</p>
-                  <p className="text-2xl font-bold text-gray-900">${safeNumber(revenueSummary.total_revenue).toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-gray-900">RWF {safeNumber(revenueSummary.total_revenue).toFixed(2)}</p>
                 </div>
                 <div className="bg-green-50 p-4 rounded-lg">
                   <p className="text-sm text-gray-600">Total Transactions</p>
@@ -386,7 +386,7 @@ const Reports = () => {
                 </div>
                 <div className="bg-purple-50 p-4 rounded-lg">
                   <p className="text-sm text-gray-600">Average Transaction</p>
-                  <p className="text-2xl font-bold text-gray-900">${safeNumber(revenueSummary.average_transaction).toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-gray-900">RWF {safeNumber(revenueSummary.average_transaction).toFixed(2)}</p>
                 </div>
               </div>
               <div className="overflow-x-auto">
@@ -406,8 +406,8 @@ const Reports = () => {
                         <td className="py-2 pr-4 capitalize">{String(row.payment_method || 'Unknown').replace('_', ' ')}</td>
                         <td className="py-2 pr-4 capitalize">{String(row.status || 'unknown')}</td>
                         <td className="py-2 pr-4 text-right">{safeNumber(row.transaction_count)}</td>
-                        <td className="py-2 pr-4 text-right">${safeNumber(row.total_amount).toFixed(2)}</td>
-                        <td className="py-2 pr-4 text-right">${safeNumber(row.average_amount).toFixed(2)}</td>
+                        <td className="py-2 pr-4 text-right">RWF {safeNumber(row.total_amount).toFixed(2)}</td>
+                        <td className="py-2 pr-4 text-right">RWF {safeNumber(row.average_amount).toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -427,7 +427,7 @@ const Reports = () => {
                 </div>
                 <div className="bg-green-50 p-4 rounded-lg">
                   <p className="text-sm text-gray-600">Total Revenue</p>
-                  <p className="text-2xl font-bold text-gray-900">${safeNumber(sellerReportSummary.total_revenue).toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-gray-900">RWF {safeNumber(sellerReportSummary.total_revenue).toFixed(2)}</p>
                 </div>
                 <div className="bg-emerald-50 p-4 rounded-lg">
                   <p className="text-sm text-gray-600">Total Allocations</p>
@@ -435,7 +435,7 @@ const Reports = () => {
                 </div>
                 <div className="bg-purple-50 p-4 rounded-lg">
                   <p className="text-sm text-gray-600">Avg Revenue / Seller</p>
-                  <p className="text-2xl font-bold text-gray-900">${safeNumber(sellerReportSummary.average_revenue_per_seller).toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-gray-900">RWF {safeNumber(sellerReportSummary.average_revenue_per_seller).toFixed(2)}</p>
                 </div>
               </div>
               <div className="overflow-x-auto">
@@ -460,7 +460,7 @@ const Reports = () => {
                         <td className="py-2 pr-4">{s.email || '-'}</td>
                         <td className="py-2 pr-4 text-right">{safeNumber(s.total_allocations)}</td>
                         <td className="py-2 pr-4 text-right">{safeNumber(s.total_payments)}</td>
-                        <td className="py-2 pr-4 text-right">${safeNumber(s.total_revenue).toFixed(2)}</td>
+                        <td className="py-2 pr-4 text-right">RWF {safeNumber(s.total_revenue).toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -480,7 +480,7 @@ const Reports = () => {
                 </div>
                 <div className="bg-green-50 p-4 rounded-lg">
                   <p className="text-sm text-gray-600">Total Revenue</p>
-                  <p className="text-2xl font-bold text-gray-900">${safeNumber(zoneStatsSummary.total_revenue).toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-gray-900">RWF {safeNumber(zoneStatsSummary.total_revenue).toFixed(2)}</p>
                 </div>
                 <div className="bg-emerald-50 p-4 rounded-lg">
                   <p className="text-sm text-gray-600">Total Allocations</p>
@@ -515,7 +515,7 @@ const Reports = () => {
                         <td className="py-2 pr-4 text-right">{safeNumber(z.total_allocations)}</td>
                         <td className="py-2 pr-4 text-right">{safeNumber(z.unique_sellers)}</td>
                         <td className="py-2 pr-4 text-right">{safeNumber(z.occupancy_rate).toFixed(2)}%</td>
-                        <td className="py-2 pr-4 text-right">${safeNumber(z.total_revenue).toFixed(2)}</td>
+                        <td className="py-2 pr-4 text-right">RWF {safeNumber(z.total_revenue).toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -597,7 +597,7 @@ const Reports = () => {
                         <>
                           <div className="bg-blue-50 p-4 rounded-lg">
                             <p className="text-sm text-gray-600">Total Revenue</p>
-                            <p className="text-2xl font-bold text-gray-900">${safeNumber(data.total_revenue).toFixed(2)}</p>
+                            <p className="text-2xl font-bold text-gray-900">RWF {safeNumber(data.total_revenue).toFixed(2)}</p>
                           </div>
                           <div className="bg-green-50 p-4 rounded-lg">
                             <p className="text-sm text-gray-600">Total Payments</p>

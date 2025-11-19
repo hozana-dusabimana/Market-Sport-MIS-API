@@ -37,10 +37,23 @@ const Login = () => {
         setUser(response.data)
         toast.success('Login successful!')
         navigate('/dashboard')
+      } else {
+        // Handle case where API returns success: false
+        const errorMessage = response.message || 'Invalid credentials. Please check your username and password.'
+        toast.error(errorMessage)
+        setIsLoading(false)
       }
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Login failed')
-    } finally {
+      // Handle network errors or HTTP error responses
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Invalid credentials. Please check your username and password.'
+      
+      // Show error message immediately
+      toast.error(errorMessage, {
+        duration: 4000,
+        position: 'top-center',
+      })
       setIsLoading(false)
     }
   }
@@ -82,7 +95,13 @@ const Login = () => {
             <h2 className="text-3xl font-bold text-gray-900 mb-8">Sign in to your account</h2>
 
             {/* Form */}
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault()
+                handleSubmit(onSubmit)(e)
+              }} 
+              className="space-y-6"
+            >
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Username or Email *

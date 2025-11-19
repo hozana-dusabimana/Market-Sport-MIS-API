@@ -91,7 +91,7 @@ export const SellerDetailsModal = ({ seller, isOpen, onClose }: SellerDetailsMod
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-green-700 uppercase">Total Payments</p>
-                  <p className="text-2xl font-bold text-green-900 mt-2">${totalPayments.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-green-900 mt-2">RWF {totalPayments.toFixed(2)}</p>
                   <p className="text-xs text-green-600 mt-1">{completedPayments} completed</p>
                 </div>
                 <DollarSign className="w-8 h-8 text-green-300" />
@@ -170,7 +170,7 @@ export const SellerDetailsModal = ({ seller, isOpen, onClose }: SellerDetailsMod
                   <div key={p.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <div className="font-semibold text-gray-900">${p.amount.toFixed(2)}</div>
+                        <div className="font-semibold text-gray-900">RWF {p.amount.toFixed(2)}</div>
                         <div className="text-sm text-gray-600">{p.description}</div>
                         <div className="flex space-x-4 mt-2 text-xs text-gray-600">
                           <span>Method: {p.payment_method}</span>
